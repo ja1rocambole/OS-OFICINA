@@ -1,13 +1,9 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
-import { join, dirname } from 'path'
-import { fileURLToPath } from 'url'
+const { app, BrowserWindow, ipcMain } = require('electron')
+const { join, resolve } = require('path')
 
-// 1. Importa a conexão com o banco de dados para iniciar junto com o app
-import db from './database.js'
-
-// 2. Recria as variáveis de diretório que não existem nativamente no ES Modules
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
+// Em desenvolvimento o arquivo gerado em out/main não contém o banco.
+// Então apontamos explicitamente para o arquivo do projeto para que o Electron consiga resolver o módulo.
+const db = require(resolve(__dirname, '../../src/main/database.js'))
 
 const createWindow = () => {
   const win = new BrowserWindow({

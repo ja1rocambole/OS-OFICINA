@@ -1,6 +1,6 @@
-import Database from 'better-sqlite3'
-import { app } from 'electron'
-import path from 'path'
+const Database = require('better-sqlite3')
+const { app } = require('electron')
+const path = require('path')
 
 // O nome do arquivo físico pode ser auto_shop.sqlite
 const dbPath = path.join(app.getPath('userData'), 'auto_shop.sqlite')
@@ -75,4 +75,4 @@ const initDb = () => {
 
 initDb()
 
-export default db
+module.exports = db

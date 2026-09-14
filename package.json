@@ -1,7 +1,6 @@
 {
   "name": "os-oficina",
   "version": "1.0.0",
-  "type": "module",
   "description": "An Electron application with React",
   "main": "./out/main/index.js",
   "author": "example.com",
