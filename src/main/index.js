@@ -170,6 +170,205 @@ ipcMain.handle('get-employees', () => {
   return stmt.all()
 })
 
+// Listar ordens de serviço
+ipcMain.handle('get-service-orders', () => {
+  const stmt = db.prepare(`
+    SELECT
+      service_orders.*,
+      customers.name AS customer_name,
+      vehicles.license_plate,
+      vehicles.brand,
+      vehicles.model,
+      employees.name AS employee_name
+    FROM service_orders
+    JOIN customers ON customers.id = service_orders.customer_id
+    JOIN vehicles ON vehicles.id = service_orders.vehicle_id
+    LEFT JOIN employees ON employees.id = service_orders.employee_id
+    ORDER BY service_orders.id DESC
+  `)
+  return stmt.all()
+})
+
+// Criar ordem de serviço
+ipcMain.handle('save-service-order', (event, serviceOrder) => {
+  if (!serviceOrder.customerId || !serviceOrder.vehicleId) {
+    throw new Error('Customer and vehicle are required')
+  }
+
+  if (!serviceOrder.reportedDefect || !serviceOrder.reportedDefect.trim()) {
+    throw new Error('Reported defect is required')
+  }
+
+  const vehicle = db
+    .prepare('SELECT id FROM vehicles WHERE id = ? AND customer_id = ?')
+    .get(serviceOrder.vehicleId, serviceOrder.customerId)
+
+  if (!vehicle) {
+    throw new Error('Vehicle does not belong to customer')
+  }
+
+  if (serviceOrder.employeeId) {
+    const employee = db
+      .prepare('SELECT id FROM employees WHERE id = ? AND is_active = 1')
+      .get(serviceOrder.employeeId)
+
+    if (!employee) {
+      throw new Error('Employee not found')
+    }
+  }
+
+  const mileage = Number(serviceOrder.mileage || 0)
+  if (mileage < 0) {
+    throw new Error('Mileage cannot be negative')
+  }
+
+  const stmt = db.prepare(`
+    INSERT INTO service_orders (
+      customer_id, vehicle_id, employee_id, mileage, reported_defect, mechanic_notes, status
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `)
+  const info = stmt.run(
+    serviceOrder.customerId,
+    serviceOrder.vehicleId,
+    serviceOrder.employeeId || null,
+    mileage,
+    serviceOrder.reportedDefect.trim(),
+    serviceOrder.mechanicNotes || null,
+    serviceOrder.status || 'Quote'
+  )
+
+  return { success: true, id: info.lastInsertRowid }
+})
+
+// Consultar os itens e a mão de obra de uma ordem de serviço
+ipcMain.handle('get-service-order-details', (event, serviceOrderId) => {
+  if (!serviceOrderId) {
+    throw new Error('Service order id is required')
+  }
+
+  const parts = db
+    .prepare(
+      `
+      SELECT service_order_parts.*, parts.description, parts.internal_code
+      FROM service_order_parts
+      JOIN parts ON parts.id = service_order_parts.part_id
+      WHERE service_order_id = ?
+      ORDER BY service_order_parts.id
+    `
+    )
+    .all(serviceOrderId)
+
+  const labor = db
+    .prepare(
+      `
+      SELECT * FROM service_order_labor
+      WHERE service_order_id = ?
+      ORDER BY id
+    `
+    )
+    .all(serviceOrderId)
+
+  return { parts, labor }
+})
+
+// Adicionar peça à ordem de serviço e baixar o estoque na mesma transação
+ipcMain.handle('add-service-order-part', (event, item) => {
+  if (!item.serviceOrderId || !item.partId) {
+    throw new Error('Service order and part are required')
+  }
+
+  const quantity = Number(item.quantity)
+  if (!Number.isInteger(quantity) || quantity <= 0) {
+    throw new Error('Part quantity must be a positive integer')
+  }
+
+  const addPart = db.transaction(() => {
+    const serviceOrder = db
+      .prepare('SELECT id FROM service_orders WHERE id = ?')
+      .get(item.serviceOrderId)
+    const part = db
+      .prepare('SELECT id, stock_quantity, selling_price FROM parts WHERE id = ?')
+      .get(item.partId)
+
+    if (!serviceOrder) {
+      throw new Error('Service order not found')
+    }
+    if (!part) {
+      throw new Error('Part not found')
+    }
+    if (part.stock_quantity < quantity) {
+      throw new Error('Insufficient part stock')
+    }
+
+    db.prepare(
+      `
+      INSERT INTO service_order_parts (service_order_id, part_id, quantity, unit_price)
+      VALUES (?, ?, ?, ?)
+    `
+    ).run(item.serviceOrderId, item.partId, quantity, part.selling_price)
+
+    db.prepare(
+      `
+      UPDATE parts
+      SET stock_quantity = stock_quantity - ?
+      WHERE id = ?
+    `
+    ).run(quantity, item.partId)
+
+    db.prepare(
+      `
+      UPDATE service_orders
+      SET total_amount = total_amount + ?
+      WHERE id = ?
+    `
+    ).run(quantity * part.selling_price, item.serviceOrderId)
+  })
+
+  addPart()
+  return { success: true }
+})
+
+// Adicionar mão de obra à ordem de serviço
+ipcMain.handle('add-service-order-labor', (event, item) => {
+  if (!item.serviceOrderId || !item.description || !item.description.trim()) {
+    throw new Error('Service order and labor description are required')
+  }
+
+  const laborCost = Number(item.laborCost)
+  if (!Number.isFinite(laborCost) || laborCost < 0) {
+    throw new Error('Labor cost must be a non-negative number')
+  }
+
+  const addLabor = db.transaction(() => {
+    const serviceOrder = db
+      .prepare('SELECT id FROM service_orders WHERE id = ?')
+      .get(item.serviceOrderId)
+
+    if (!serviceOrder) {
+      throw new Error('Service order not found')
+    }
+
+    db.prepare(
+      `
+      INSERT INTO service_order_labor (service_order_id, description, labor_cost)
+      VALUES (?, ?, ?)
+    `
+    ).run(item.serviceOrderId, item.description.trim(), laborCost)
+
+    db.prepare(
+      `
+      UPDATE service_orders
+      SET total_amount = total_amount + ?
+      WHERE id = ?
+    `
+    ).run(laborCost, item.serviceOrderId)
+  })
+
+  addLabor()
+  return { success: true }
+})
+
 // Salvar Funcionário
 ipcMain.handle('save-employee', (event, employee) => {
   if (!employee.name || !employee.name.trim()) {

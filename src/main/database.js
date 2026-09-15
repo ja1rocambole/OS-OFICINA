@@ -52,6 +52,7 @@ const initDb = () => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       customer_id INTEGER,
       vehicle_id INTEGER,
+      employee_id INTEGER,
       mileage INTEGER,
       reported_defect TEXT,
       mechanic_notes TEXT,
@@ -60,7 +61,8 @@ const initDb = () => {
       exit_date DATETIME,
       total_amount REAL DEFAULT 0,
       FOREIGN KEY (customer_id) REFERENCES customers(id),
-      FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
+      FOREIGN KEY (vehicle_id) REFERENCES vehicles(id),
+      FOREIGN KEY (employee_id) REFERENCES employees(id)
     );
 
     CREATE TABLE IF NOT EXISTS service_order_parts (
@@ -81,6 +83,15 @@ const initDb = () => {
       FOREIGN KEY (service_order_id) REFERENCES service_orders(id)
     );
   `)
+
+  const serviceOrderColumns = db.prepare('PRAGMA table_info(service_orders)').all()
+  const hasEmployeeId = serviceOrderColumns.some((column) => column.name === 'employee_id')
+
+  if (!hasEmployeeId) {
+    db.exec(`
+      ALTER TABLE service_orders ADD COLUMN employee_id INTEGER REFERENCES employees(id)
+    `)
+  }
 }
 
 initDb()

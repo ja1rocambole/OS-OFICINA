@@ -6,7 +6,9 @@ function App() {
   const [employees, setEmployees] = useState([])
   const [vehicles, setVehicles] = useState([])
   const [parts, setParts] = useState([])
+  const [serviceOrders, setServiceOrders] = useState([])
   const [selectedCustomerId, setSelectedCustomerId] = useState('')
+  const [serviceOrderVehicles, setServiceOrderVehicles] = useState([])
   const [customerForm, setCustomerForm] = useState({
     name: '',
     phone: '',
@@ -35,6 +37,15 @@ function App() {
     stockQuantity: '0',
     costPrice: '0',
     sellingPrice: '0'
+  })
+  const [serviceOrderForm, setServiceOrderForm] = useState({
+    customerId: '',
+    vehicleId: '',
+    employeeId: '',
+    mileage: '',
+    reportedDefect: '',
+    mechanicNotes: '',
+    status: 'Quote'
   })
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
@@ -75,15 +86,30 @@ function App() {
     }
   }
 
+  const loadServiceOrders = async () => {
+    try {
+      setServiceOrders(await window.api.getServiceOrders())
+    } catch (loadError) {
+      console.error(loadError)
+      setError('Não foi possível carregar as ordens de serviço.')
+    }
+  }
+
   useEffect(() => {
     let isMounted = true
 
-    Promise.all([window.api.getCustomers(), window.api.getEmployees(), window.api.getParts()])
-      .then(([customerList, employeeList, partList]) => {
+    Promise.all([
+      window.api.getCustomers(),
+      window.api.getEmployees(),
+      window.api.getParts(),
+      window.api.getServiceOrders()
+    ])
+      .then(([customerList, employeeList, partList, serviceOrderList]) => {
         if (isMounted) {
           setCustomers(customerList)
           setEmployees(employeeList)
           setParts(partList)
+          setServiceOrders(serviceOrderList)
         }
       })
       .catch((loadError) => {
@@ -106,7 +132,9 @@ function App() {
           ? setEmployeeForm
           : activeModule === 'vehicles'
             ? setVehicleForm
-            : setPartForm
+            : activeModule === 'parts'
+              ? setPartForm
+              : setServiceOrderForm
     updateForm((currentData) => ({ ...currentData, [target.name]: target.value }))
   }
 
@@ -120,10 +148,27 @@ function App() {
           ? employeeForm
           : activeModule === 'vehicles'
             ? vehicleForm
-            : partForm
+            : activeModule === 'parts'
+              ? partForm
+              : serviceOrderForm
 
     if (activeModule === 'vehicles' && !formData.customerId) {
       setError('Selecione um cliente para o veículo.')
+      return
+    }
+
+    if (activeModule === 'service-orders' && !formData.customerId) {
+      setError('Selecione um cliente para a ordem de serviço.')
+      return
+    }
+
+    if (activeModule === 'service-orders' && !formData.vehicleId) {
+      setError('Selecione um veículo para a ordem de serviço.')
+      return
+    }
+
+    if (activeModule === 'service-orders' && !formData.reportedDefect.trim()) {
+      setError('Informe o defeito relatado pelo cliente.')
       return
     }
 
@@ -169,7 +214,7 @@ function App() {
           color: ''
         })
         await loadVehicles(selectedCustomerId)
-      } else {
+      } else if (activeModule === 'parts') {
         if (partForm.id) {
           await window.api.updatePart(formData)
         } else {
@@ -184,6 +229,19 @@ function App() {
           sellingPrice: '0'
         })
         await loadParts()
+      } else if (activeModule === 'service-orders') {
+        await window.api.saveServiceOrder(formData)
+        setServiceOrderForm({
+          customerId: '',
+          vehicleId: '',
+          employeeId: '',
+          mileage: '',
+          reportedDefect: '',
+          mechanicNotes: '',
+          status: 'Quote'
+        })
+        setServiceOrderVehicles([])
+        await loadServiceOrders()
       }
     } catch (saveError) {
       console.error(saveError)
@@ -195,7 +253,9 @@ function App() {
               ? 'funcionário'
               : activeModule === 'vehicles'
                 ? 'veículo'
-                : 'peça'
+                : activeModule === 'parts'
+                  ? 'peça'
+                  : 'ordem de serviço'
         }.`
       )
     } finally {
@@ -208,6 +268,21 @@ function App() {
     setVehicleForm((currentData) => ({ ...currentData, customerId: target.value }))
     setError('')
     await loadVehicles(target.value)
+  }
+
+  const handleServiceOrderCustomerSelection = async ({ target }) => {
+    const customerId = target.value
+    setServiceOrderForm((currentData) => ({
+      ...currentData,
+      customerId,
+      vehicleId: ''
+    }))
+    setError('')
+    setServiceOrderVehicles([])
+
+    if (customerId) {
+      setServiceOrderVehicles(await window.api.getVehiclesByCustomer(customerId))
+    }
   }
 
   const handleEditEmployee = (employee) => {
@@ -253,20 +328,25 @@ function App() {
   const isCustomerModule = activeModule === 'customers'
   const isEmployeeModule = activeModule === 'employees'
   const isVehicleModule = activeModule === 'vehicles'
+  const isServiceOrderModule = activeModule === 'service-orders'
   const formData = isCustomerModule
     ? customerForm
     : isEmployeeModule
       ? employeeForm
       : isVehicleModule
         ? vehicleForm
-        : partForm
+        : activeModule === 'parts'
+          ? partForm
+          : serviceOrderForm
   const moduleLabel = isCustomerModule
     ? 'Clientes'
     : isEmployeeModule
       ? 'Funcionários'
       : isVehicleModule
         ? 'Veículos'
-        : 'Peças e estoque'
+        : activeModule === 'parts'
+          ? 'Peças e estoque'
+          : 'Ordens de serviço'
 
   return (
     <main className="app-shell">
@@ -281,7 +361,9 @@ function App() {
                 ? 'Gerencie os funcionários da oficina.'
                 : isVehicleModule
                   ? 'Cadastre veículos vinculados aos clientes.'
-                  : 'Controle peças, estoque e preços de venda.'}
+                  : activeModule === 'parts'
+                    ? 'Controle peças, estoque e preços de venda.'
+                    : 'Abra e acompanhe as ordens da oficina.'}
           </p>
         </div>
         <span className="customer-count">
@@ -291,7 +373,9 @@ function App() {
               ? employees.length
               : isVehicleModule
                 ? vehicles.length
-                : parts.length}{' '}
+                : activeModule === 'parts'
+                  ? parts.length
+                  : serviceOrders.length}{' '}
           cadastrados
         </span>
       </header>
@@ -337,6 +421,16 @@ function App() {
         >
           Peças
         </button>
+        <button
+          type="button"
+          className={isServiceOrderModule ? 'active' : ''}
+          onClick={() => {
+            setActiveModule('service-orders')
+            setError('')
+          }}
+        >
+          Ordens de serviço
+        </button>
       </nav>
 
       <section className="content-grid">
@@ -354,7 +448,9 @@ function App() {
                           ? 'funcionário'
                           : isVehicleModule
                             ? 'veículo'
-                            : 'peça'
+                            : activeModule === 'parts'
+                              ? 'peça'
+                              : 'ordem de serviço'
                     }`}
               </h2>
             </div>
@@ -414,6 +510,89 @@ function App() {
                   onChange={handleChange}
                   inputMode="numeric"
                 />
+              </label>
+            </>
+          ) : isServiceOrderModule ? (
+            <>
+              <label>
+                Cliente
+                <select
+                  name="customerId"
+                  value={formData.customerId}
+                  onChange={handleServiceOrderCustomerSelection}
+                  required
+                >
+                  <option value="">Selecione um cliente</option>
+                  {customers.map((customer) => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Veículo
+                <select
+                  name="vehicleId"
+                  value={formData.vehicleId}
+                  onChange={handleChange}
+                  required
+                >
+                  <option value="">Selecione um veículo</option>
+                  {serviceOrderVehicles.map((vehicle) => (
+                    <option key={vehicle.id} value={vehicle.id}>
+                      {vehicle.license_plate} - {vehicle.brand || ''} {vehicle.model || ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Funcionário responsável
+                <select name="employeeId" value={formData.employeeId} onChange={handleChange}>
+                  <option value="">Não atribuído</option>
+                  {employees.map((employee) => (
+                    <option key={employee.id} value={employee.id}>
+                      {employee.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Quilometragem
+                <input
+                  name="mileage"
+                  type="number"
+                  min="0"
+                  value={formData.mileage}
+                  onChange={handleChange}
+                />
+              </label>
+              <label>
+                Defeito relatado
+                <textarea
+                  name="reportedDefect"
+                  value={formData.reportedDefect}
+                  onChange={handleChange}
+                  required
+                />
+              </label>
+              <label>
+                Observações do mecânico
+                <textarea
+                  name="mechanicNotes"
+                  value={formData.mechanicNotes}
+                  onChange={handleChange}
+                />
+              </label>
+              <label>
+                Status
+                <select name="status" value={formData.status} onChange={handleChange}>
+                  <option value="Quote">Orçamento</option>
+                  <option value="Open">Aberta</option>
+                  <option value="In Progress">Em andamento</option>
+                  <option value="Completed">Concluída</option>
+                  <option value="Canceled">Cancelada</option>
+                </select>
               </label>
             </>
           ) : (
@@ -524,7 +703,9 @@ function App() {
                       ? selectedCustomerId
                         ? 'Veículos do cliente'
                         : 'Selecione um cliente'
-                      : 'Peças cadastradas'}
+                      : activeModule === 'parts'
+                        ? 'Peças cadastradas'
+                        : 'Ordens de serviço'}
               </h2>
             </div>
           </div>
@@ -546,7 +727,9 @@ function App() {
                     ? selectedCustomerId
                       ? 'Nenhum veículo cadastrado para este cliente.'
                       : 'Selecione um cliente para consultar seus veículos.'
-                    : 'Nenhuma peça cadastrada ainda.'}
+                    : activeModule === 'parts'
+                      ? 'Nenhuma peça cadastrada ainda.'
+                      : 'Nenhuma ordem de serviço cadastrada ainda.'}
             </p>
           ) : (
             <div className="table-wrapper">
@@ -576,7 +759,7 @@ function App() {
                         <th>Ano</th>
                         <th>Cor</th>
                       </>
-                    ) : (
+                    ) : activeModule === 'parts' ? (
                       <>
                         <th>Código</th>
                         <th>Descrição</th>
@@ -584,6 +767,15 @@ function App() {
                         <th>Custo</th>
                         <th>Venda</th>
                         <th>Ações</th>
+                      </>
+                    ) : (
+                      <>
+                        <th>OS</th>
+                        <th>Cliente</th>
+                        <th>Veículo</th>
+                        <th>Responsável</th>
+                        <th>Status</th>
+                        <th>Entrada</th>
                       </>
                     )}
                   </tr>
@@ -629,20 +821,34 @@ function App() {
                               <td>{vehicle.color || '-'}</td>
                             </tr>
                           ))
-                        : parts.map((part) => (
-                            <tr key={part.id}>
-                              <td>{part.internal_code || '-'}</td>
-                              <td>{part.description}</td>
-                              <td>{part.stock_quantity}</td>
-                              <td>R$ {Number(part.cost_price).toFixed(2)}</td>
-                              <td>R$ {Number(part.selling_price).toFixed(2)}</td>
-                              <td className="row-actions">
-                                <button type="button" onClick={() => handleEditPart(part)}>
-                                  Editar
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
+                        : activeModule === 'parts'
+                          ? parts.map((part) => (
+                              <tr key={part.id}>
+                                <td>{part.internal_code || '-'}</td>
+                                <td>{part.description}</td>
+                                <td>{part.stock_quantity}</td>
+                                <td>R$ {Number(part.cost_price).toFixed(2)}</td>
+                                <td>R$ {Number(part.selling_price).toFixed(2)}</td>
+                                <td className="row-actions">
+                                  <button type="button" onClick={() => handleEditPart(part)}>
+                                    Editar
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          : serviceOrders.map((serviceOrder) => (
+                              <tr key={serviceOrder.id}>
+                                <td>#{serviceOrder.id}</td>
+                                <td>{serviceOrder.customer_name}</td>
+                                <td>
+                                  {serviceOrder.license_plate} - {serviceOrder.brand || ''}{' '}
+                                  {serviceOrder.model || ''}
+                                </td>
+                                <td>{serviceOrder.employee_name || 'Não atribuído'}</td>
+                                <td>{serviceOrder.status}</td>
+                                <td>{serviceOrder.entry_date}</td>
+                              </tr>
+                            ))}
                 </tbody>
               </table>
             </div>
