@@ -76,6 +76,13 @@ Ao propor alterações, responder sempre com:
 3. Patch/snippets por arquivo
 4. Passo a passo de teste manual
 5. Riscos e rollback simples
+6. Recomendação de commit em inglês ao finalizar cada etapa ou módulo concluído
+
+O commit não deve ser criado automaticamente sem autorização explícita. A recomendação deve usar uma mensagem curta e seguir o padrão Conventional Commits, por exemplo:
+
+```text
+feat: add service order management
+```
 
 ## 9) Restrições importantes
 
