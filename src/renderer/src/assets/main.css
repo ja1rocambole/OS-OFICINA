@@ -68,6 +68,26 @@ h2 {
   white-space: nowrap;
 }
 
+.module-tabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 28px;
+  border-bottom: 1px solid #d9d2c8;
+}
+
+.module-tabs button {
+  margin: 0;
+  border-radius: 4px 4px 0 0;
+  background: transparent;
+  color: #6a7475;
+}
+
+.module-tabs button:hover,
+.module-tabs button.active {
+  background: #243238;
+  color: #fffdf9;
+}
+
 .content-grid {
   display: grid;
   grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
@@ -97,7 +117,8 @@ label {
   font-weight: 700;
 }
 
-input {
+input,
+select {
   width: 100%;
   padding: 11px 12px;
   border: 1px solid #d9d2c8;
@@ -108,7 +129,8 @@ input {
   outline: none;
 }
 
-input:focus {
+input:focus,
+select:focus {
   border-color: #b25c36;
   box-shadow: 0 0 0 3px rgba(178, 92, 54, 0.12);
 }
@@ -132,6 +154,17 @@ button:hover:not(:disabled) {
 button:disabled {
   cursor: wait;
   opacity: 0.65;
+}
+
+.secondary-button {
+  margin-top: -8px;
+  border: 1px solid #d9d2c8;
+  background: transparent;
+  color: #536061;
+}
+
+.secondary-button:hover {
+  background: #f4f1eb;
 }
 
 .form-error {
@@ -171,6 +204,25 @@ th {
 td {
   color: #3e4b4d;
   font-size: 14px;
+}
+
+.row-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.row-actions button {
+  margin: 0;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+.danger-button {
+  background: #a33d32;
+}
+
+.danger-button:hover {
+  background: #873129;
 }
 
 .empty-state {
