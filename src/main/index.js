@@ -94,6 +94,76 @@ ipcMain.handle('save-vehicle', (event, vehicle) => {
   return { success: true, id: info.lastInsertRowid }
 })
 
+// Listar peças
+ipcMain.handle('get-parts', () => {
+  const stmt = db.prepare('SELECT * FROM parts ORDER BY description')
+  return stmt.all()
+})
+
+// Salvar peça
+ipcMain.handle('save-part', (event, part) => {
+  if (!part.description || !part.description.trim()) {
+    throw new Error('Part description is required')
+  }
+
+  const stockQuantity = Number(part.stockQuantity || 0)
+  const costPrice = Number(part.costPrice || 0)
+  const sellingPrice = Number(part.sellingPrice || 0)
+
+  if (stockQuantity < 0 || costPrice < 0 || sellingPrice < 0) {
+    throw new Error('Part values cannot be negative')
+  }
+
+  const stmt = db.prepare(`
+    INSERT INTO parts (internal_code, description, stock_quantity, cost_price, selling_price)
+    VALUES (?, ?, ?, ?, ?)
+  `)
+  const info = stmt.run(
+    part.internalCode || null,
+    part.description.trim(),
+    stockQuantity,
+    costPrice,
+    sellingPrice
+  )
+
+  return { success: true, id: info.lastInsertRowid }
+})
+
+// Atualizar peça
+ipcMain.handle('update-part', (event, part) => {
+  if (!part.id || !part.description || !part.description.trim()) {
+    throw new Error('Part id and description are required')
+  }
+
+  const stockQuantity = Number(part.stockQuantity || 0)
+  const costPrice = Number(part.costPrice || 0)
+  const sellingPrice = Number(part.sellingPrice || 0)
+
+  if (stockQuantity < 0 || costPrice < 0 || sellingPrice < 0) {
+    throw new Error('Part values cannot be negative')
+  }
+
+  const stmt = db.prepare(`
+    UPDATE parts
+    SET internal_code = ?, description = ?, stock_quantity = ?, cost_price = ?, selling_price = ?
+    WHERE id = ?
+  `)
+  const info = stmt.run(
+    part.internalCode || null,
+    part.description.trim(),
+    stockQuantity,
+    costPrice,
+    sellingPrice,
+    part.id
+  )
+
+  if (info.changes === 0) {
+    throw new Error('Part not found')
+  }
+
+  return { success: true }
+})
+
 // Listar Funcionários ativos
 ipcMain.handle('get-employees', () => {
   const stmt = db.prepare('SELECT * FROM employees WHERE is_active = 1 ORDER BY name')

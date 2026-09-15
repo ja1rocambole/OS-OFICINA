@@ -5,6 +5,7 @@ function App() {
   const [customers, setCustomers] = useState([])
   const [employees, setEmployees] = useState([])
   const [vehicles, setVehicles] = useState([])
+  const [parts, setParts] = useState([])
   const [selectedCustomerId, setSelectedCustomerId] = useState('')
   const [customerForm, setCustomerForm] = useState({
     name: '',
@@ -26,6 +27,14 @@ function App() {
     model: '',
     year: '',
     color: ''
+  })
+  const [partForm, setPartForm] = useState({
+    id: null,
+    internalCode: '',
+    description: '',
+    stockQuantity: '0',
+    costPrice: '0',
+    sellingPrice: '0'
   })
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
@@ -57,14 +66,24 @@ function App() {
     }
   }
 
+  const loadParts = async () => {
+    try {
+      setParts(await window.api.getParts())
+    } catch (loadError) {
+      console.error(loadError)
+      setError('Não foi possível carregar as peças.')
+    }
+  }
+
   useEffect(() => {
     let isMounted = true
 
-    Promise.all([window.api.getCustomers(), window.api.getEmployees()])
-      .then(([customerList, employeeList]) => {
+    Promise.all([window.api.getCustomers(), window.api.getEmployees(), window.api.getParts()])
+      .then(([customerList, employeeList, partList]) => {
         if (isMounted) {
           setCustomers(customerList)
           setEmployees(employeeList)
+          setParts(partList)
         }
       })
       .catch((loadError) => {
@@ -85,7 +104,9 @@ function App() {
         ? setCustomerForm
         : activeModule === 'employees'
           ? setEmployeeForm
-          : setVehicleForm
+          : activeModule === 'vehicles'
+            ? setVehicleForm
+            : setPartForm
     updateForm((currentData) => ({ ...currentData, [target.name]: target.value }))
   }
 
@@ -97,10 +118,17 @@ function App() {
         ? customerForm
         : activeModule === 'employees'
           ? employeeForm
-          : vehicleForm
+          : activeModule === 'vehicles'
+            ? vehicleForm
+            : partForm
 
     if (activeModule === 'vehicles' && !formData.customerId) {
       setError('Selecione um cliente para o veículo.')
+      return
+    }
+
+    if (activeModule === 'parts' && !formData.description.trim()) {
+      setError('Informe a descrição da peça.')
       return
     }
 
@@ -109,7 +137,7 @@ function App() {
       return
     }
 
-    if (activeModule !== 'vehicles' && !formData.name.trim()) {
+    if (!['vehicles', 'parts'].includes(activeModule) && !formData.name.trim()) {
       setError(`Informe o nome do ${activeModule === 'customers' ? 'cliente' : 'funcionário'}.`)
       return
     }
@@ -130,7 +158,7 @@ function App() {
         await window.api.saveEmployee(formData)
         setEmployeeForm({ id: null, name: '', phone: '', document: '', role: '' })
         await loadEmployees()
-      } else {
+      } else if (activeModule === 'vehicles') {
         await window.api.saveVehicle(formData)
         setVehicleForm({
           customerId: selectedCustomerId,
@@ -141,6 +169,21 @@ function App() {
           color: ''
         })
         await loadVehicles(selectedCustomerId)
+      } else {
+        if (partForm.id) {
+          await window.api.updatePart(formData)
+        } else {
+          await window.api.savePart(formData)
+        }
+        setPartForm({
+          id: null,
+          internalCode: '',
+          description: '',
+          stockQuantity: '0',
+          costPrice: '0',
+          sellingPrice: '0'
+        })
+        await loadParts()
       }
     } catch (saveError) {
       console.error(saveError)
@@ -150,7 +193,9 @@ function App() {
             ? 'cliente'
             : activeModule === 'employees'
               ? 'funcionário'
-              : 'veículo'
+              : activeModule === 'vehicles'
+                ? 'veículo'
+                : 'peça'
         }.`
       )
     } finally {
@@ -192,10 +237,36 @@ function App() {
     }
   }
 
+  const handleEditPart = (part) => {
+    setActiveModule('parts')
+    setError('')
+    setPartForm({
+      id: part.id,
+      internalCode: part.internal_code || '',
+      description: part.description,
+      stockQuantity: String(part.stock_quantity),
+      costPrice: String(part.cost_price),
+      sellingPrice: String(part.selling_price)
+    })
+  }
+
   const isCustomerModule = activeModule === 'customers'
   const isEmployeeModule = activeModule === 'employees'
-  const formData = isCustomerModule ? customerForm : isEmployeeModule ? employeeForm : vehicleForm
-  const moduleLabel = isCustomerModule ? 'Clientes' : isEmployeeModule ? 'Funcionários' : 'Veículos'
+  const isVehicleModule = activeModule === 'vehicles'
+  const formData = isCustomerModule
+    ? customerForm
+    : isEmployeeModule
+      ? employeeForm
+      : isVehicleModule
+        ? vehicleForm
+        : partForm
+  const moduleLabel = isCustomerModule
+    ? 'Clientes'
+    : isEmployeeModule
+      ? 'Funcionários'
+      : isVehicleModule
+        ? 'Veículos'
+        : 'Peças e estoque'
 
   return (
     <main className="app-shell">
@@ -208,7 +279,9 @@ function App() {
               ? 'Cadastre e consulte os clientes da oficina.'
               : isEmployeeModule
                 ? 'Gerencie os funcionários da oficina.'
-                : 'Cadastre veículos vinculados aos clientes.'}
+                : isVehicleModule
+                  ? 'Cadastre veículos vinculados aos clientes.'
+                  : 'Controle peças, estoque e preços de venda.'}
           </p>
         </div>
         <span className="customer-count">
@@ -216,7 +289,9 @@ function App() {
             ? customers.length
             : isEmployeeModule
               ? employees.length
-              : vehicles.length}{' '}
+              : isVehicleModule
+                ? vehicles.length
+                : parts.length}{' '}
           cadastrados
         </span>
       </header>
@@ -252,6 +327,16 @@ function App() {
         >
           Veículos
         </button>
+        <button
+          type="button"
+          className={activeModule === 'parts' ? 'active' : ''}
+          onClick={() => {
+            setActiveModule('parts')
+            setError('')
+          }}
+        >
+          Peças
+        </button>
       </nav>
 
       <section className="content-grid">
@@ -262,7 +347,15 @@ function App() {
               <h2>
                 {formData.id
                   ? 'Editar funcionário'
-                  : `Cadastrar ${isCustomerModule ? 'cliente' : isEmployeeModule ? 'funcionário' : 'veículo'}`}
+                  : `Cadastrar ${
+                      isCustomerModule
+                        ? 'cliente'
+                        : isEmployeeModule
+                          ? 'funcionário'
+                          : isVehicleModule
+                            ? 'veículo'
+                            : 'peça'
+                    }`}
               </h2>
             </div>
           </div>
@@ -282,7 +375,7 @@ function App() {
                 <input name="document" value={formData.document} onChange={handleChange} />
               </label>
             </>
-          ) : (
+          ) : isVehicleModule ? (
             <>
               <label>
                 Cliente
@@ -323,6 +416,55 @@ function App() {
                 />
               </label>
             </>
+          ) : (
+            <>
+              <label>
+                Código interno
+                <input name="internalCode" value={formData.internalCode} onChange={handleChange} />
+              </label>
+              <label>
+                Descrição
+                <input
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  required
+                />
+              </label>
+              <label>
+                Quantidade em estoque
+                <input
+                  name="stockQuantity"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.stockQuantity}
+                  onChange={handleChange}
+                />
+              </label>
+              <label>
+                Preço de custo
+                <input
+                  name="costPrice"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.costPrice}
+                  onChange={handleChange}
+                />
+              </label>
+              <label>
+                Preço de venda
+                <input
+                  name="sellingPrice"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.sellingPrice}
+                  onChange={handleChange}
+                />
+              </label>
+            </>
           )}
           {isCustomerModule ? (
             <label>
@@ -334,23 +476,32 @@ function App() {
               Cargo
               <input name="role" value={formData.role} onChange={handleChange} />
             </label>
-          ) : (
+          ) : isVehicleModule ? (
             <label>
               Cor
               <input name="color" value={formData.color} onChange={handleChange} />
             </label>
-          )}
+          ) : null}
 
           {error && <p className="form-error">{error}</p>}
           <button type="submit" disabled={isSaving}>
             {isSaving ? 'Salvando...' : formData.id ? 'Atualizar funcionário' : 'Salvar registro'}
           </button>
-          {isEmployeeModule && formData.id && (
+          {(isEmployeeModule || activeModule === 'parts') && formData.id && (
             <button
               type="button"
               className="secondary-button"
               onClick={() =>
-                setEmployeeForm({ id: null, name: '', phone: '', document: '', role: '' })
+                isEmployeeModule
+                  ? setEmployeeForm({ id: null, name: '', phone: '', document: '', role: '' })
+                  : setPartForm({
+                      id: null,
+                      internalCode: '',
+                      description: '',
+                      stockQuantity: '0',
+                      costPrice: '0',
+                      sellingPrice: '0'
+                    })
               }
             >
               Cancelar edição
@@ -369,22 +520,33 @@ function App() {
                   ? 'Clientes cadastrados'
                   : isEmployeeModule
                     ? 'Funcionários ativos'
-                    : selectedCustomerId
-                      ? 'Veículos do cliente'
-                      : 'Selecione um cliente'}
+                    : isVehicleModule
+                      ? selectedCustomerId
+                        ? 'Veículos do cliente'
+                        : 'Selecione um cliente'
+                      : 'Peças cadastradas'}
               </h2>
             </div>
           </div>
 
-          {(isCustomerModule ? customers : isEmployeeModule ? employees : vehicles).length === 0 ? (
+          {(isCustomerModule
+            ? customers
+            : isEmployeeModule
+              ? employees
+              : isVehicleModule
+                ? vehicles
+                : parts
+          ).length === 0 ? (
             <p className="empty-state">
               {isCustomerModule
                 ? 'Nenhum cliente cadastrado ainda.'
                 : isEmployeeModule
                   ? 'Nenhum funcionário cadastrado ainda.'
-                  : selectedCustomerId
-                    ? 'Nenhum veículo cadastrado para este cliente.'
-                    : 'Selecione um cliente para consultar seus veículos.'}
+                  : isVehicleModule
+                    ? selectedCustomerId
+                      ? 'Nenhum veículo cadastrado para este cliente.'
+                      : 'Selecione um cliente para consultar seus veículos.'
+                    : 'Nenhuma peça cadastrada ainda.'}
             </p>
           ) : (
             <div className="table-wrapper">
@@ -406,13 +568,22 @@ function App() {
                         <th>Cargo</th>
                         <th>Ações</th>
                       </>
-                    ) : (
+                    ) : isVehicleModule ? (
                       <>
                         <th>Placa</th>
                         <th>Marca</th>
                         <th>Modelo</th>
                         <th>Ano</th>
                         <th>Cor</th>
+                      </>
+                    ) : (
+                      <>
+                        <th>Código</th>
+                        <th>Descrição</th>
+                        <th>Estoque</th>
+                        <th>Custo</th>
+                        <th>Venda</th>
+                        <th>Ações</th>
                       </>
                     )}
                   </tr>
@@ -448,17 +619,30 @@ function App() {
                             </td>
                           </tr>
                         ))
-                      : vehicles.map((vehicle) => (
-                          <tr key={vehicle.id}>
-                            <td>{vehicle.license_plate}</td>
-                            <td>{vehicle.brand || '-'}</td>
-                            <td>
-                              {[vehicle.brand, vehicle.model].filter(Boolean).join(' ') || '-'}
-                            </td>
-                            <td>{vehicle.year || '-'}</td>
-                            <td>{vehicle.color || '-'}</td>
-                          </tr>
-                        ))}
+                      : isVehicleModule
+                        ? vehicles.map((vehicle) => (
+                            <tr key={vehicle.id}>
+                              <td>{vehicle.license_plate}</td>
+                              <td>{vehicle.brand || '-'}</td>
+                              <td>{vehicle.model || '-'}</td>
+                              <td>{vehicle.year || '-'}</td>
+                              <td>{vehicle.color || '-'}</td>
+                            </tr>
+                          ))
+                        : parts.map((part) => (
+                            <tr key={part.id}>
+                              <td>{part.internal_code || '-'}</td>
+                              <td>{part.description}</td>
+                              <td>{part.stock_quantity}</td>
+                              <td>R$ {Number(part.cost_price).toFixed(2)}</td>
+                              <td>R$ {Number(part.selling_price).toFixed(2)}</td>
+                              <td className="row-actions">
+                                <button type="button" onClick={() => handleEditPart(part)}>
+                                  Editar
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
                 </tbody>
               </table>
             </div>
