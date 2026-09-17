@@ -7,6 +7,8 @@ function App() {
   const [vehicles, setVehicles] = useState([])
   const [parts, setParts] = useState([])
   const [serviceOrders, setServiceOrders] = useState([])
+  const [selectedServiceOrderId, setSelectedServiceOrderId] = useState('')
+  const [serviceOrderDetails, setServiceOrderDetails] = useState({ parts: [], labor: [] })
   const [selectedCustomerId, setSelectedCustomerId] = useState('')
   const [serviceOrderVehicles, setServiceOrderVehicles] = useState([])
   const [customerForm, setCustomerForm] = useState({
@@ -46,6 +48,14 @@ function App() {
     reportedDefect: '',
     mechanicNotes: '',
     status: 'Quote'
+  })
+  const [serviceOrderPartForm, setServiceOrderPartForm] = useState({
+    partId: '',
+    quantity: '1'
+  })
+  const [serviceOrderLaborForm, setServiceOrderLaborForm] = useState({
+    description: '',
+    laborCost: ''
   })
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
@@ -92,6 +102,15 @@ function App() {
     } catch (loadError) {
       console.error(loadError)
       setError('Não foi possível carregar as ordens de serviço.')
+    }
+  }
+
+  const loadServiceOrderDetails = async (serviceOrderId) => {
+    try {
+      setServiceOrderDetails(await window.api.getServiceOrderDetails(serviceOrderId))
+    } catch (loadError) {
+      console.error(loadError)
+      setError('Não foi possível carregar os itens da ordem de serviço.')
     }
   }
 
@@ -282,6 +301,62 @@ function App() {
 
     if (customerId) {
       setServiceOrderVehicles(await window.api.getVehiclesByCustomer(customerId))
+    }
+  }
+
+  const handleServiceOrderSelection = async (serviceOrderId) => {
+    setSelectedServiceOrderId(serviceOrderId)
+    setError('')
+    await loadServiceOrderDetails(serviceOrderId)
+  }
+
+  const handleAddServiceOrderPart = async (event) => {
+    event.preventDefault()
+
+    if (!serviceOrderPartForm.partId || Number(serviceOrderPartForm.quantity) <= 0) {
+      setError('Selecione uma peça e informe uma quantidade válida.')
+      return
+    }
+
+    try {
+      setError('')
+      await window.api.addServiceOrderPart({
+        serviceOrderId: selectedServiceOrderId,
+        partId: serviceOrderPartForm.partId,
+        quantity: serviceOrderPartForm.quantity
+      })
+      setServiceOrderPartForm({ partId: '', quantity: '1' })
+      await Promise.all([
+        loadServiceOrderDetails(selectedServiceOrderId),
+        loadParts(),
+        loadServiceOrders()
+      ])
+    } catch (itemError) {
+      console.error(itemError)
+      setError('Não foi possível adicionar a peça à ordem de serviço.')
+    }
+  }
+
+  const handleAddServiceOrderLabor = async (event) => {
+    event.preventDefault()
+
+    if (!serviceOrderLaborForm.description.trim() || Number(serviceOrderLaborForm.laborCost) < 0) {
+      setError('Informe a descrição e um custo válido para a mão de obra.')
+      return
+    }
+
+    try {
+      setError('')
+      await window.api.addServiceOrderLabor({
+        serviceOrderId: selectedServiceOrderId,
+        description: serviceOrderLaborForm.description,
+        laborCost: serviceOrderLaborForm.laborCost
+      })
+      setServiceOrderLaborForm({ description: '', laborCost: '' })
+      await Promise.all([loadServiceOrderDetails(selectedServiceOrderId), loadServiceOrders()])
+    } catch (itemError) {
+      console.error(itemError)
+      setError('Não foi possível adicionar a mão de obra à ordem de serviço.')
     }
   }
 
@@ -838,7 +913,15 @@ function App() {
                             ))
                           : serviceOrders.map((serviceOrder) => (
                               <tr key={serviceOrder.id}>
-                                <td>#{serviceOrder.id}</td>
+                                <td>
+                                  <button
+                                    type="button"
+                                    className="table-link"
+                                    onClick={() => handleServiceOrderSelection(serviceOrder.id)}
+                                  >
+                                    #{serviceOrder.id}
+                                  </button>
+                                </td>
                                 <td>{serviceOrder.customer_name}</td>
                                 <td>
                                   {serviceOrder.license_plate} - {serviceOrder.brand || ''}{' '}
@@ -855,6 +938,135 @@ function App() {
           )}
         </section>
       </section>
+
+      {isServiceOrderModule && selectedServiceOrderId && (
+        <section className="service-order-details">
+          <div className="panel-heading">
+            <div>
+              <p className="section-kicker">Detalhamento</p>
+              <h2>Itens da OS #{selectedServiceOrderId}</h2>
+            </div>
+            <strong className="service-order-total">
+              Total: R${' '}
+              {Number(
+                serviceOrders.find((order) => order.id === Number(selectedServiceOrderId))
+                  ?.total_amount || 0
+              ).toFixed(2)}
+            </strong>
+          </div>
+
+          <div className="details-grid">
+            <form className="item-form" onSubmit={handleAddServiceOrderPart}>
+              <h3>Adicionar peça</h3>
+              <label>
+                Peça
+                <select
+                  value={serviceOrderPartForm.partId}
+                  onChange={({ target }) =>
+                    setServiceOrderPartForm((currentData) => ({
+                      ...currentData,
+                      partId: target.value
+                    }))
+                  }
+                  required
+                >
+                  <option value="">Selecione uma peça</option>
+                  {parts.map((part) => (
+                    <option key={part.id} value={part.id}>
+                      {part.description} ({part.stock_quantity} em estoque)
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Quantidade
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={serviceOrderPartForm.quantity}
+                  onChange={({ target }) =>
+                    setServiceOrderPartForm((currentData) => ({
+                      ...currentData,
+                      quantity: target.value
+                    }))
+                  }
+                />
+              </label>
+              <button type="submit">Adicionar peça</button>
+            </form>
+
+            <form className="item-form" onSubmit={handleAddServiceOrderLabor}>
+              <h3>Adicionar mão de obra</h3>
+              <label>
+                Descrição
+                <input
+                  value={serviceOrderLaborForm.description}
+                  onChange={({ target }) =>
+                    setServiceOrderLaborForm((currentData) => ({
+                      ...currentData,
+                      description: target.value
+                    }))
+                  }
+                  required
+                />
+              </label>
+              <label>
+                Custo
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={serviceOrderLaborForm.laborCost}
+                  onChange={({ target }) =>
+                    setServiceOrderLaborForm((currentData) => ({
+                      ...currentData,
+                      laborCost: target.value
+                    }))
+                  }
+                  required
+                />
+              </label>
+              <button type="submit">Adicionar mão de obra</button>
+            </form>
+          </div>
+
+          <div className="details-grid">
+            <div>
+              <h3>Peças utilizadas</h3>
+              {serviceOrderDetails.parts.length === 0 ? (
+                <p className="empty-state">Nenhuma peça adicionada.</p>
+              ) : (
+                <ul className="detail-list">
+                  {serviceOrderDetails.parts.map((item) => (
+                    <li key={item.id}>
+                      <span>
+                        {item.description} x {item.quantity}
+                      </span>
+                      <strong>R$ {(item.quantity * item.unit_price).toFixed(2)}</strong>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div>
+              <h3>Mão de obra</h3>
+              {serviceOrderDetails.labor.length === 0 ? (
+                <p className="empty-state">Nenhuma mão de obra adicionada.</p>
+              ) : (
+                <ul className="detail-list">
+                  {serviceOrderDetails.labor.map((item) => (
+                    <li key={item.id}>
+                      <span>{item.description}</span>
+                      <strong>R$ {Number(item.labor_cost).toFixed(2)}</strong>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
     </main>
   )
 }

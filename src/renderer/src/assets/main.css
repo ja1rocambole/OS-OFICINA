@@ -118,7 +118,8 @@ label {
 }
 
 input,
-select {
+select,
+textarea {
   width: 100%;
   padding: 11px 12px;
   border: 1px solid #d9d2c8;
@@ -130,7 +131,8 @@ select {
 }
 
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   border-color: #b25c36;
   box-shadow: 0 0 0 3px rgba(178, 92, 54, 0.12);
 }
@@ -206,6 +208,79 @@ td {
   font-size: 14px;
 }
 
+.table-link {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  color: #b25c36;
+  font-size: inherit;
+}
+
+.table-link:hover {
+  background: transparent;
+  color: #944a2c;
+  text-decoration: underline;
+}
+
+.service-order-details {
+  margin-top: 24px;
+  padding: 26px;
+  border: 1px solid #dfd8ce;
+  border-radius: 8px;
+  background: #fffdf9;
+  box-shadow: 0 12px 30px rgba(57, 48, 38, 0.06);
+}
+
+.service-order-total {
+  color: #b25c36;
+  white-space: nowrap;
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.item-form,
+.details-grid > div {
+  padding: 18px;
+  border: 1px solid #ebe5dd;
+  border-radius: 6px;
+}
+
+h3 {
+  margin: 0 0 16px;
+  font-size: 16px;
+}
+
+.item-form {
+  display: grid;
+  gap: 14px;
+}
+
+.item-form button {
+  margin-top: 0;
+}
+
+.detail-list {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.detail-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #ebe5dd;
+  color: #536061;
+  font-size: 14px;
+}
+
 .row-actions {
   display: flex;
   gap: 8px;
@@ -237,6 +312,10 @@ td {
   }
 
   .content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .details-grid {
     grid-template-columns: 1fr;
   }
 
