@@ -14,6 +14,7 @@ const api = {
   getServiceOrders: () => ipcRenderer.invoke('get-service-orders'),
   saveServiceOrder: (serviceOrderData) =>
     ipcRenderer.invoke('save-service-order', serviceOrderData),
+  updateServiceOrderStatus: (data) => ipcRenderer.invoke('update-service-order-status', data),
   getServiceOrderDetails: (serviceOrderId) =>
     ipcRenderer.invoke('get-service-order-details', serviceOrderId),
   addServiceOrderPart: (itemData) => ipcRenderer.invoke('add-service-order-part', itemData),

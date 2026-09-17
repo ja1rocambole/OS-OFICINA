@@ -321,6 +321,22 @@ function App() {
     await loadServiceOrderDetails(serviceOrderId)
   }
 
+  const handleServiceOrderStatus = async (serviceOrderId, status) => {
+    const action = status === 'Completed' ? 'concluir' : 'cancelar'
+    if (!window.confirm(`Deseja ${action} esta ordem de serviço?`)) {
+      return
+    }
+
+    try {
+      setError('')
+      await window.api.updateServiceOrderStatus({ serviceOrderId, status })
+      await loadServiceOrders()
+    } catch (statusError) {
+      console.error(statusError)
+      setError('Não foi possível atualizar o status da ordem de serviço.')
+    }
+  }
+
   const handleAddServiceOrderPart = async (event) => {
     event.preventDefault()
 
@@ -959,6 +975,7 @@ function App() {
                         <th>Responsável</th>
                         <th>Status</th>
                         <th>Entrada</th>
+                        <th>Ações</th>
                       </>
                     )}
                   </tr>
@@ -1055,6 +1072,29 @@ function App() {
                                 <td>{serviceOrder.employee_name || 'Não atribuído'}</td>
                                 <td>{serviceOrder.status}</td>
                                 <td>{serviceOrder.entry_date}</td>
+                                <td className="row-actions">
+                                  {!['Completed', 'Canceled'].includes(serviceOrder.status) && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleServiceOrderStatus(serviceOrder.id, 'Completed')
+                                        }
+                                      >
+                                        Concluir
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="danger-button"
+                                        onClick={() =>
+                                          handleServiceOrderStatus(serviceOrder.id, 'Canceled')
+                                        }
+                                      >
+                                        Cancelar
+                                      </button>
+                                    </>
+                                  )}
+                                </td>
                               </tr>
                             ))}
                 </tbody>

@@ -332,6 +332,38 @@ ipcMain.handle('save-service-order', (event, serviceOrder) => {
   return { success: true, id: info.lastInsertRowid }
 })
 
+// Atualizar status da ordem de serviço
+ipcMain.handle('update-service-order-status', (event, data) => {
+  const allowedStatuses = ['Quote', 'Open', 'In Progress', 'Completed', 'Canceled']
+  if (!data.serviceOrderId || !allowedStatuses.includes(data.status)) {
+    throw new Error('Service order and valid status are required')
+  }
+
+  const serviceOrder = db
+    .prepare('SELECT id, status FROM service_orders WHERE id = ?')
+    .get(data.serviceOrderId)
+  if (!serviceOrder) {
+    throw new Error('Service order not found')
+  }
+
+  const exitDate = ['Completed', 'Canceled'].includes(data.status) ? 'CURRENT_TIMESTAMP' : 'NULL'
+  const info = db
+    .prepare(
+      `
+      UPDATE service_orders
+      SET status = ?, exit_date = ${exitDate}
+      WHERE id = ?
+    `
+    )
+    .run(data.status, data.serviceOrderId)
+
+  if (info.changes === 0) {
+    throw new Error('Service order was not updated')
+  }
+
+  return { success: true }
+})
+
 // Consultar os itens e a mão de obra de uma ordem de serviço
 ipcMain.handle('get-service-order-details', (event, serviceOrderId) => {
   if (!serviceOrderId) {
