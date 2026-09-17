@@ -43,6 +43,32 @@ ipcMain.handle('get-customers', () => {
   return stmt.all() // Retorna um array com todos os clientes cadastrados
 })
 
+// Atualizar Cliente
+ipcMain.handle('update-customer', (event, customer) => {
+  if (!customer.id || !customer.name || !customer.name.trim()) {
+    throw new Error('Customer id and name are required')
+  }
+
+  const stmt = db.prepare(`
+    UPDATE customers
+    SET name = ?, phone = ?, document = ?, address = ?
+    WHERE id = ?
+  `)
+  const info = stmt.run(
+    customer.name.trim(),
+    customer.phone || null,
+    customer.document || null,
+    customer.address || null,
+    customer.id
+  )
+
+  if (info.changes === 0) {
+    throw new Error('Customer not found')
+  }
+
+  return { success: true }
+})
+
 // Listar veículos de um cliente
 ipcMain.handle('get-vehicles-by-customer', (event, customerId) => {
   if (!customerId) {

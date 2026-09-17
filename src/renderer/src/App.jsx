@@ -12,6 +12,7 @@ function App() {
   const [selectedCustomerId, setSelectedCustomerId] = useState('')
   const [serviceOrderVehicles, setServiceOrderVehicles] = useState([])
   const [customerForm, setCustomerForm] = useState({
+    id: null,
     name: '',
     phone: '',
     document: '',
@@ -211,8 +212,12 @@ function App() {
 
     try {
       if (activeModule === 'customers') {
-        await window.api.saveCustomer(formData)
-        setCustomerForm({ name: '', phone: '', document: '', address: '' })
+        if (customerForm.id) {
+          await window.api.updateCustomer(formData)
+        } else {
+          await window.api.saveCustomer(formData)
+        }
+        setCustomerForm({ id: null, name: '', phone: '', document: '', address: '' })
         await loadCustomers()
       } else if (activeModule === 'employees' && employeeForm.id) {
         await window.api.updateEmployee(formData)
@@ -403,6 +408,18 @@ function App() {
       phone: employee.phone || '',
       document: employee.document || '',
       role: employee.role || ''
+    })
+  }
+
+  const handleEditCustomer = (customer) => {
+    setActiveModule('customers')
+    setError('')
+    setCustomerForm({
+      id: customer.id,
+      name: customer.name,
+      phone: customer.phone || '',
+      document: customer.document || '',
+      address: customer.address || ''
     })
   }
 
@@ -773,23 +790,31 @@ function App() {
 
           {error && <p className="form-error">{error}</p>}
           <button type="submit" disabled={isSaving}>
-            {isSaving ? 'Salvando...' : formData.id ? 'Atualizar funcionário' : 'Salvar registro'}
+            {isSaving
+              ? 'Salvando...'
+              : formData.id
+                ? isCustomerModule
+                  ? 'Atualizar cliente'
+                  : 'Atualizar funcionário'
+                : 'Salvar registro'}
           </button>
-          {(isEmployeeModule || activeModule === 'parts') && formData.id && (
+          {(isCustomerModule || isEmployeeModule || activeModule === 'parts') && formData.id && (
             <button
               type="button"
               className="secondary-button"
               onClick={() =>
-                isEmployeeModule
-                  ? setEmployeeForm({ id: null, name: '', phone: '', document: '', role: '' })
-                  : setPartForm({
-                      id: null,
-                      internalCode: '',
-                      description: '',
-                      stockQuantity: '0',
-                      costPrice: '0',
-                      sellingPrice: '0'
-                    })
+                isCustomerModule
+                  ? setCustomerForm({ id: null, name: '', phone: '', document: '', address: '' })
+                  : isEmployeeModule
+                    ? setEmployeeForm({ id: null, name: '', phone: '', document: '', role: '' })
+                    : setPartForm({
+                        id: null,
+                        internalCode: '',
+                        description: '',
+                        stockQuantity: '0',
+                        costPrice: '0',
+                        sellingPrice: '0'
+                      })
               }
             >
               Cancelar edição
@@ -851,6 +876,7 @@ function App() {
                         <th>Telefone</th>
                         <th>Documento</th>
                         <th>Endereço</th>
+                        <th>Ações</th>
                       </>
                     ) : isEmployeeModule ? (
                       <>
@@ -897,6 +923,11 @@ function App() {
                           <td>{customer.phone || '-'}</td>
                           <td>{customer.document || '-'}</td>
                           <td>{customer.address || '-'}</td>
+                          <td className="row-actions">
+                            <button type="button" onClick={() => handleEditCustomer(customer)}>
+                              Editar
+                            </button>
+                          </td>
                         </tr>
                       ))
                     : isEmployeeModule

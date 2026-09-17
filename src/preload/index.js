@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 const api = {
   saveCustomer: (customerData) => ipcRenderer.invoke('save-customer', customerData),
   getCustomers: () => ipcRenderer.invoke('get-customers'),
+  updateCustomer: (customerData) => ipcRenderer.invoke('update-customer', customerData),
   getVehiclesByCustomer: (customerId) => ipcRenderer.invoke('get-vehicles-by-customer', customerId),
   saveVehicle: (vehicleData) => ipcRenderer.invoke('save-vehicle', vehicleData),
   getParts: () => ipcRenderer.invoke('get-parts'),
