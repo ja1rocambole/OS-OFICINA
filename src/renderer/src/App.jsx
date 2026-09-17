@@ -26,6 +26,7 @@ function App() {
     role: ''
   })
   const [vehicleForm, setVehicleForm] = useState({
+    id: null,
     customerId: '',
     licensePlate: '',
     brand: '',
@@ -228,8 +229,13 @@ function App() {
         setEmployeeForm({ id: null, name: '', phone: '', document: '', role: '' })
         await loadEmployees()
       } else if (activeModule === 'vehicles') {
-        await window.api.saveVehicle(formData)
+        if (vehicleForm.id) {
+          await window.api.updateVehicle(formData)
+        } else {
+          await window.api.saveVehicle(formData)
+        }
         setVehicleForm({
+          id: null,
           customerId: selectedCustomerId,
           licensePlate: '',
           brand: '',
@@ -449,6 +455,36 @@ function App() {
       costPrice: String(part.cost_price),
       sellingPrice: String(part.selling_price)
     })
+  }
+
+  const handleEditVehicle = (vehicle) => {
+    setActiveModule('vehicles')
+    setSelectedCustomerId(String(vehicle.customer_id))
+    setError('')
+    setVehicleForm({
+      id: vehicle.id,
+      customerId: String(vehicle.customer_id),
+      licensePlate: vehicle.license_plate,
+      brand: vehicle.brand || '',
+      model: vehicle.model || '',
+      year: vehicle.year || '',
+      color: vehicle.color || ''
+    })
+  }
+
+  const handleDeleteVehicle = async (vehicleId) => {
+    if (!window.confirm('Deseja excluir este veículo?')) {
+      return
+    }
+
+    try {
+      setError('')
+      await window.api.deleteVehicle(vehicleId)
+      await loadVehicles(selectedCustomerId)
+    } catch (deleteError) {
+      console.error(deleteError)
+      setError('Não foi possível excluir o veículo. Ele pode possuir histórico de OS.')
+    }
   }
 
   const isCustomerModule = activeModule === 'customers'
@@ -798,28 +834,39 @@ function App() {
                   : 'Atualizar funcionário'
                 : 'Salvar registro'}
           </button>
-          {(isCustomerModule || isEmployeeModule || activeModule === 'parts') && formData.id && (
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() =>
-                isCustomerModule
-                  ? setCustomerForm({ id: null, name: '', phone: '', document: '', address: '' })
-                  : isEmployeeModule
-                    ? setEmployeeForm({ id: null, name: '', phone: '', document: '', role: '' })
-                    : setPartForm({
-                        id: null,
-                        internalCode: '',
-                        description: '',
-                        stockQuantity: '0',
-                        costPrice: '0',
-                        sellingPrice: '0'
-                      })
-              }
-            >
-              Cancelar edição
-            </button>
-          )}
+          {(isCustomerModule || isEmployeeModule || isVehicleModule || activeModule === 'parts') &&
+            formData.id && (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() =>
+                  isCustomerModule
+                    ? setCustomerForm({ id: null, name: '', phone: '', document: '', address: '' })
+                    : isVehicleModule
+                      ? setVehicleForm({
+                          id: null,
+                          customerId: selectedCustomerId,
+                          licensePlate: '',
+                          brand: '',
+                          model: '',
+                          year: '',
+                          color: ''
+                        })
+                      : isEmployeeModule
+                        ? setEmployeeForm({ id: null, name: '', phone: '', document: '', role: '' })
+                        : setPartForm({
+                            id: null,
+                            internalCode: '',
+                            description: '',
+                            stockQuantity: '0',
+                            costPrice: '0',
+                            sellingPrice: '0'
+                          })
+                }
+              >
+                Cancelar edição
+              </button>
+            )}
         </form>
 
         <section className="panel customer-list">
@@ -893,6 +940,7 @@ function App() {
                         <th>Modelo</th>
                         <th>Ano</th>
                         <th>Cor</th>
+                        <th>Ações</th>
                       </>
                     ) : activeModule === 'parts' ? (
                       <>
@@ -959,6 +1007,18 @@ function App() {
                               <td>{vehicle.model || '-'}</td>
                               <td>{vehicle.year || '-'}</td>
                               <td>{vehicle.color || '-'}</td>
+                              <td className="row-actions">
+                                <button type="button" onClick={() => handleEditVehicle(vehicle)}>
+                                  Editar
+                                </button>
+                                <button
+                                  type="button"
+                                  className="danger-button"
+                                  onClick={() => handleDeleteVehicle(vehicle.id)}
+                                >
+                                  Excluir
+                                </button>
+                              </td>
                             </tr>
                           ))
                         : activeModule === 'parts'

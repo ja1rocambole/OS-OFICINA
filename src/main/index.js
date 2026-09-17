@@ -120,6 +120,71 @@ ipcMain.handle('save-vehicle', (event, vehicle) => {
   return { success: true, id: info.lastInsertRowid }
 })
 
+// Atualizar veículo
+ipcMain.handle('update-vehicle', (event, vehicle) => {
+  if (!vehicle.id || !vehicle.customerId || !vehicle.licensePlate?.trim()) {
+    throw new Error('Vehicle id, customer and license plate are required')
+  }
+
+  const customerExists = db.prepare('SELECT id FROM customers WHERE id = ?').get(vehicle.customerId)
+  if (!customerExists) {
+    throw new Error('Customer not found')
+  }
+
+  const licensePlate = vehicle.licensePlate.trim().toUpperCase()
+  const duplicate = db
+    .prepare('SELECT id FROM vehicles WHERE license_plate = ? AND id <> ?')
+    .get(licensePlate, vehicle.id)
+  if (duplicate) {
+    throw new Error('License plate already registered')
+  }
+
+  const info = db
+    .prepare(
+      `
+      UPDATE vehicles
+      SET customer_id = ?, license_plate = ?, brand = ?, model = ?, year = ?, color = ?
+      WHERE id = ?
+    `
+    )
+    .run(
+      vehicle.customerId,
+      licensePlate,
+      vehicle.brand || null,
+      vehicle.model || null,
+      vehicle.year || null,
+      vehicle.color || null,
+      vehicle.id
+    )
+
+  if (info.changes === 0) {
+    throw new Error('Vehicle not found')
+  }
+
+  return { success: true }
+})
+
+// Excluir veículo sem histórico de OS
+ipcMain.handle('delete-vehicle', (event, vehicleId) => {
+  if (!vehicleId) {
+    throw new Error('Vehicle id is required')
+  }
+
+  const order = db
+    .prepare('SELECT id FROM service_orders WHERE vehicle_id = ? LIMIT 1')
+    .get(vehicleId)
+  if (order) {
+    throw new Error('Vehicle has service order history')
+  }
+
+  const info = db.prepare('DELETE FROM vehicles WHERE id = ?').run(vehicleId)
+  if (info.changes === 0) {
+    throw new Error('Vehicle not found')
+  }
+
+  return { success: true }
+})
+
 // Listar peças
 ipcMain.handle('get-parts', () => {
   const stmt = db.prepare('SELECT * FROM parts ORDER BY description')
