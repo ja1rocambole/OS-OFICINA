@@ -23,13 +23,22 @@ const createWindow = () => {
 
 // Salvar Cliente
 ipcMain.handle('save-customer', (event, customer) => {
+  if (!customer.name || !customer.name.trim()) {
+    throw new Error('Customer name is required')
+  }
+
   const stmt = db.prepare(`
     INSERT INTO customers (name, phone, document, address)
     VALUES (?, ?, ?, ?)
   `)
 
   // O .run() executa a inserção substituindo as interrogações (?) pelos valores
-  const info = stmt.run(customer.name, customer.phone, customer.document, customer.address)
+  const info = stmt.run(
+    customer.name.trim(),
+    customer.phone || null,
+    customer.document || null,
+    customer.address || null
+  )
 
   // Retorna para o frontend o ID que o banco acabou de gerar
   return { success: true, id: info.lastInsertRowid }
@@ -94,12 +103,19 @@ ipcMain.handle('save-vehicle', (event, vehicle) => {
   }
 
   const licensePlate = vehicle.licensePlate.trim().toUpperCase()
+  if (!/^[A-Z0-9]{7,8}$/.test(licensePlate)) {
+    throw new Error('License plate must contain 7 or 8 letters and numbers')
+  }
   const plateExists = db
     .prepare('SELECT id FROM vehicles WHERE license_plate = ?')
     .get(licensePlate)
 
   if (plateExists) {
     throw new Error('License plate already registered')
+  }
+
+  if (vehicle.year && !/^\d{4}$/.test(String(vehicle.year))) {
+    throw new Error('Vehicle year must contain four digits')
   }
 
   const stmt = db.prepare(`
@@ -135,6 +151,10 @@ ipcMain.handle('update-vehicle', (event, vehicle) => {
     .get(licensePlate, vehicle.id)
   if (duplicate) {
     throw new Error('License plate already registered')
+  }
+
+  if (vehicle.year && !/^\d{4}$/.test(String(vehicle.year))) {
+    throw new Error('Vehicle year must contain four digits')
   }
 
   const info = db
@@ -199,7 +219,14 @@ ipcMain.handle('save-part', (event, part) => {
   const costPrice = Number(part.costPrice || 0)
   const sellingPrice = Number(part.sellingPrice || 0)
 
-  if (stockQuantity < 0 || costPrice < 0 || sellingPrice < 0) {
+  if (
+    !Number.isFinite(stockQuantity) ||
+    !Number.isFinite(costPrice) ||
+    !Number.isFinite(sellingPrice) ||
+    stockQuantity < 0 ||
+    costPrice < 0 ||
+    sellingPrice < 0
+  ) {
     throw new Error('Part values cannot be negative')
   }
 
@@ -228,7 +255,14 @@ ipcMain.handle('update-part', (event, part) => {
   const costPrice = Number(part.costPrice || 0)
   const sellingPrice = Number(part.sellingPrice || 0)
 
-  if (stockQuantity < 0 || costPrice < 0 || sellingPrice < 0) {
+  if (
+    !Number.isFinite(stockQuantity) ||
+    !Number.isFinite(costPrice) ||
+    !Number.isFinite(sellingPrice) ||
+    stockQuantity < 0 ||
+    costPrice < 0 ||
+    sellingPrice < 0
+  ) {
     throw new Error('Part values cannot be negative')
   }
 
@@ -307,8 +341,12 @@ ipcMain.handle('save-service-order', (event, serviceOrder) => {
   }
 
   const mileage = Number(serviceOrder.mileage || 0)
-  if (mileage < 0) {
+  const allowedStatuses = ['Quote', 'Open', 'In Progress', 'Completed', 'Canceled']
+  if (!Number.isInteger(mileage) || mileage < 0) {
     throw new Error('Mileage cannot be negative')
+  }
+  if (!allowedStatuses.includes(serviceOrder.status || 'Quote')) {
+    throw new Error('Invalid service order status')
   }
 
   const stmt = db.prepare(`
