@@ -571,7 +571,7 @@ function App() {
         </button>
         <button
           type="button"
-          className={!isCustomerModule ? 'active' : ''}
+          className={isEmployeeModule ? 'active' : ''}
           onClick={() => {
             setActiveModule('employees')
             setError('')

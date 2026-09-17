@@ -1,9 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron')
-const { join, resolve } = require('path')
+const { join } = require('path')
 
-// Em desenvolvimento o arquivo gerado em out/main não contém o banco.
-// Então apontamos explicitamente para o arquivo do projeto para que o Electron consiga resolver o módulo.
-const db = require(resolve(__dirname, '../../src/main/database.js'))
+const db = require('./database.js')
 
 const createWindow = () => {
   const win = new BrowserWindow({
