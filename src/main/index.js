@@ -369,6 +369,68 @@ ipcMain.handle('add-service-order-labor', (event, item) => {
   return { success: true }
 })
 
+// Remover peça da OS e devolver a quantidade ao estoque
+ipcMain.handle('remove-service-order-part', (event, itemId) => {
+  if (!itemId) {
+    throw new Error('Service order part id is required')
+  }
+
+  const removePart = db.transaction(() => {
+    const item = db
+      .prepare(
+        `
+        SELECT service_order_id, part_id, quantity, unit_price
+        FROM service_order_parts
+        WHERE id = ?
+      `
+      )
+      .get(itemId)
+
+    if (!item) {
+      throw new Error('Service order part not found')
+    }
+
+    db.prepare('DELETE FROM service_order_parts WHERE id = ?').run(itemId)
+    db.prepare('UPDATE parts SET stock_quantity = stock_quantity + ? WHERE id = ?').run(
+      item.quantity,
+      item.part_id
+    )
+    db.prepare('UPDATE service_orders SET total_amount = total_amount - ? WHERE id = ?').run(
+      item.quantity * item.unit_price,
+      item.service_order_id
+    )
+  })
+
+  removePart()
+  return { success: true }
+})
+
+// Remover mão de obra da OS
+ipcMain.handle('remove-service-order-labor', (event, itemId) => {
+  if (!itemId) {
+    throw new Error('Service order labor id is required')
+  }
+
+  const removeLabor = db.transaction(() => {
+    const item = db
+      .prepare('SELECT service_order_id, labor_cost FROM service_order_labor WHERE id = ?')
+      .get(itemId)
+
+    if (!item) {
+      throw new Error('Service order labor not found')
+    }
+
+    db.prepare('DELETE FROM service_order_labor WHERE id = ?').run(itemId)
+    db.prepare('UPDATE service_orders SET total_amount = total_amount - ? WHERE id = ?').run(
+      item.labor_cost,
+      item.service_order_id
+    )
+  })
+
+  removeLabor()
+  return { success: true }
+})
+
 // Salvar Funcionário
 ipcMain.handle('save-employee', (event, employee) => {
   if (!employee.name || !employee.name.trim()) {

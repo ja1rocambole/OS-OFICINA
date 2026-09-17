@@ -281,6 +281,18 @@ h3 {
   font-size: 14px;
 }
 
+.detail-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.detail-actions button {
+  margin: 0;
+  padding: 5px 8px;
+  font-size: 11px;
+}
+
 .row-actions {
   display: flex;
   gap: 8px;

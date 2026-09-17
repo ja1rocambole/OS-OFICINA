@@ -360,6 +360,40 @@ function App() {
     }
   }
 
+  const handleRemoveServiceOrderPart = async (itemId) => {
+    if (!window.confirm('Deseja remover esta peça da ordem de serviço?')) {
+      return
+    }
+
+    try {
+      setError('')
+      await window.api.removeServiceOrderPart(itemId)
+      await Promise.all([
+        loadServiceOrderDetails(selectedServiceOrderId),
+        loadParts(),
+        loadServiceOrders()
+      ])
+    } catch (itemError) {
+      console.error(itemError)
+      setError('Não foi possível remover a peça da ordem de serviço.')
+    }
+  }
+
+  const handleRemoveServiceOrderLabor = async (itemId) => {
+    if (!window.confirm('Deseja remover esta mão de obra da ordem de serviço?')) {
+      return
+    }
+
+    try {
+      setError('')
+      await window.api.removeServiceOrderLabor(itemId)
+      await Promise.all([loadServiceOrderDetails(selectedServiceOrderId), loadServiceOrders()])
+    } catch (itemError) {
+      console.error(itemError)
+      setError('Não foi possível remover a mão de obra da ordem de serviço.')
+    }
+  }
+
   const handleEditEmployee = (employee) => {
     setActiveModule('employees')
     setError('')
@@ -1043,7 +1077,16 @@ function App() {
                       <span>
                         {item.description} x {item.quantity}
                       </span>
-                      <strong>R$ {(item.quantity * item.unit_price).toFixed(2)}</strong>
+                      <span className="detail-actions">
+                        <strong>R$ {(item.quantity * item.unit_price).toFixed(2)}</strong>
+                        <button
+                          type="button"
+                          className="danger-button"
+                          onClick={() => handleRemoveServiceOrderPart(item.id)}
+                        >
+                          Remover
+                        </button>
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -1058,7 +1101,16 @@ function App() {
                   {serviceOrderDetails.labor.map((item) => (
                     <li key={item.id}>
                       <span>{item.description}</span>
-                      <strong>R$ {Number(item.labor_cost).toFixed(2)}</strong>
+                      <span className="detail-actions">
+                        <strong>R$ {Number(item.labor_cost).toFixed(2)}</strong>
+                        <button
+                          type="button"
+                          className="danger-button"
+                          onClick={() => handleRemoveServiceOrderLabor(item.id)}
+                        >
+                          Remover
+                        </button>
+                      </span>
                     </li>
                   ))}
                 </ul>

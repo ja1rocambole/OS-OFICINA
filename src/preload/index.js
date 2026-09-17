@@ -15,6 +15,8 @@ const api = {
     ipcRenderer.invoke('get-service-order-details', serviceOrderId),
   addServiceOrderPart: (itemData) => ipcRenderer.invoke('add-service-order-part', itemData),
   addServiceOrderLabor: (itemData) => ipcRenderer.invoke('add-service-order-labor', itemData),
+  removeServiceOrderPart: (itemId) => ipcRenderer.invoke('remove-service-order-part', itemId),
+  removeServiceOrderLabor: (itemId) => ipcRenderer.invoke('remove-service-order-labor', itemId),
   getEmployees: () => ipcRenderer.invoke('get-employees'),
   saveEmployee: (employeeData) => ipcRenderer.invoke('save-employee', employeeData),
   updateEmployee: (employeeData) => ipcRenderer.invoke('update-employee', employeeData),
