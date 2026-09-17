@@ -8,7 +8,18 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve('src/main/index.js'),
-          database: resolve('src/main/database.js')
+          database: resolve('src/main/database.js'),
+          'handlers/customerHandlers': resolve('src/main/handlers/customerHandlers.js'),
+          'handlers/employeeHandlers': resolve('src/main/handlers/employeeHandlers.js'),
+          'handlers/vehicleHandlers': resolve('src/main/handlers/vehicleHandlers.js'),
+          'handlers/partHandlers': resolve('src/main/handlers/partHandlers.js'),
+          'handlers/serviceOrderHandlers': resolve('src/main/handlers/serviceOrderHandlers.js'),
+          'handlers/serviceOrderPartHandlers': resolve(
+            'src/main/handlers/serviceOrderPartHandlers.js'
+          ),
+          'handlers/serviceOrderLaborHandlers': resolve(
+            'src/main/handlers/serviceOrderLaborHandlers.js'
+          )
         }
       }
     }
