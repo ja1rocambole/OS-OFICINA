@@ -56,6 +56,7 @@ function App() {
   const [laborItem, setLaborItem] = useState({ description: '', laborCost: '' })
   const [notice, setNotice] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [globalSearch, setGlobalSearch] = useState('')
 
   const notify = (type, message) => {
     setNotice({ type, message })
@@ -105,6 +106,57 @@ function App() {
   const changeView = (nextView) => {
     setView(nextView)
     setNotice(null)
+  }
+
+  const searchTerm = globalSearch.trim().toLowerCase()
+  const searchResults = searchTerm
+    ? [
+        ...customers
+          .filter((item) =>
+            [item.name, item.phone, item.document].some((value) =>
+              value?.toLowerCase().includes(searchTerm)
+            )
+          )
+          .map((item) => ({
+            type: 'Cliente',
+            label: item.name,
+            detail: item.phone || item.document || '',
+            view: 'customers',
+            id: item.id
+          })),
+        ...orders
+          .filter((item) =>
+            [item.customer_name, item.license_plate, String(item.id)].some((value) =>
+              value?.toLowerCase().includes(searchTerm)
+            )
+          )
+          .map((item) => ({
+            type: 'OS',
+            label: `OS #${item.id}`,
+            detail: `${item.customer_name} · ${item.license_plate}`,
+            view: 'service-orders',
+            id: item.id
+          })),
+        ...vehicles
+          .filter((item) =>
+            [item.license_plate, item.brand, item.model].some((value) =>
+              value?.toLowerCase().includes(searchTerm)
+            )
+          )
+          .map((item) => ({
+            type: 'Veículo',
+            label: item.license_plate,
+            detail: `${item.brand || ''} ${item.model || ''}`,
+            view: 'vehicles',
+            id: item.id
+          }))
+      ].slice(0, 8)
+    : []
+
+  const openSearchResult = async (result) => {
+    setGlobalSearch('')
+    changeView(result.view)
+    if (result.view === 'service-orders') await openOrder(result.id)
   }
 
   const updateForm = (type, field, value) => {
@@ -221,6 +273,12 @@ function App() {
     }
   }
 
+  const orderAction = (action) => {
+    if (action === 'print') window.print()
+    if (action === 'whatsapp') notify('success', 'Resumo preparado para envio via WhatsApp.')
+    if (action === 'finish' && selectedOrder) changeStatus(selectedOrder, 'Completed')
+  }
+
   const edit = (type, record) => setForms((current) => ({ ...current, [type]: record }))
   const deactivateEmployee = async (id) => {
     if (window.confirm('Desativar este funcionario?')) {
@@ -294,6 +352,39 @@ function App() {
               })}
             </p>
           </div>
+          <div className="global-search">
+            <span>⌕</span>
+            <input
+              value={globalSearch}
+              onChange={({ target }) => setGlobalSearch(target.value)}
+              placeholder="Buscar por placa, CPF ou nome..."
+              aria-label="Busca global"
+            />
+            {globalSearch && (
+              <button type="button" onClick={() => setGlobalSearch('')}>
+                ×
+              </button>
+            )}
+            {globalSearch && (
+              <div className="search-results">
+                {searchResults.length ? (
+                  searchResults.map((result) => (
+                    <button
+                      type="button"
+                      key={`${result.type}-${result.id}`}
+                      onClick={() => openSearchResult(result)}
+                    >
+                      <span>{result.type}</span>
+                      <strong>{result.label}</strong>
+                      <small>{result.detail}</small>
+                    </button>
+                  ))
+                ) : (
+                  <p>Nenhum registro encontrado.</p>
+                )}
+              </div>
+            )}
+          </div>
           <div className="profile">
             <b>OF</b> Oficina local
           </div>
@@ -309,7 +400,9 @@ function App() {
                 .length
             }}
             orders={orders}
+            parts={parts}
             onOpen={changeView}
+            onSelectOrder={openOrder}
           />
         ) : (
           <>
@@ -402,6 +495,7 @@ function App() {
                 setLaborItem={setLaborItem}
                 addPart={addPart}
                 addLabor={addLabor}
+                onAction={orderAction}
               />
             )}
           </>
@@ -411,7 +505,7 @@ function App() {
   )
 }
 
-function Dashboard({ stats, orders, onOpen }) {
+function Dashboard({ stats, orders, parts, onOpen, onSelectOrder }) {
   return (
     <section className="dashboard">
       <div className="hero">
@@ -442,10 +536,52 @@ function Dashboard({ stats, orders, onOpen }) {
           </div>
         ))}
       </div>
+      <section className="card kanban-card">
+        <CardTitle
+          eyebrow="FLUXO DE TRABALHO"
+          title="Quadro de serviços"
+          action="Ver todas"
+          onAction={() => onOpen('service-orders')}
+        />
+        <div className="kanban-board">
+          {[
+            ['Quote', 'Avaliando'],
+            ['Open', 'Aguardando peças'],
+            ['In Progress', 'Em execução'],
+            ['Completed', 'Pronto para retirada'],
+            ['Canceled', 'Finalizado']
+          ].map(([status, label]) => (
+            <div className="kanban-column" key={status}>
+              <div className="kanban-heading">
+                <span>{label}</span>
+                <b>{orders.filter((item) => item.status === status).length}</b>
+              </div>
+              {orders
+                .filter((item) => item.status === status)
+                .slice(0, 4)
+                .map((item) => (
+                  <button
+                    type="button"
+                    className="kanban-item"
+                    key={item.id}
+                    onClick={() => {
+                      onOpen('service-orders')
+                      onSelectOrder(item.id)
+                    }}
+                  >
+                    <strong>OS #{item.id}</strong>
+                    <span>{item.license_plate}</span>
+                    <small>{item.customer_name}</small>
+                  </button>
+                ))}
+            </div>
+          ))}
+        </div>
+      </section>
       <div className="dashboard-grid">
         <section className="card recent">
           <CardTitle
-            eyebrow="FLUXO DE TRABALHO"
+            eyebrow="ATIVIDADE"
             title="Ordens recentes"
             action="Ver todas"
             onAction={() => onOpen('service-orders')}
@@ -457,12 +593,14 @@ function Dashboard({ stats, orders, onOpen }) {
           )}
         </section>
         <section className="card stock-card">
-          <CardTitle eyebrow="ESTOQUE" title="Resumo rápido" />
+          <CardTitle eyebrow="ESTOQUE" title="Atenção necessária" />
           <div className="stock-summary">
-            <b>+</b>
+            <b>!</b>
             <div>
-              <strong>{stats.parts} tipos de pecas</strong>
-              <p>Controle o inventario e os precos de venda.</p>
+              <strong>
+                {parts.filter((item) => item.stock_quantity < 2).length} itens em estoque baixo
+              </strong>
+              <p>Revise o inventário antes dos próximos serviços.</p>
             </div>
           </div>
           <button type="button" className="outline" onClick={() => onOpen('parts')}>
@@ -831,7 +969,8 @@ function OrderModule({
   laborItem,
   setLaborItem,
   addPart,
-  addLabor
+  addLabor,
+  onAction
 }) {
   return (
     <div className="orders-layout">
@@ -896,6 +1035,8 @@ function OrderModule({
           setLaborItem={setLaborItem}
           addPart={addPart}
           addLabor={addLabor}
+          order={orders.find((item) => item.id === selected)}
+          onAction={onAction}
         />
       )}
     </div>
@@ -958,11 +1099,38 @@ function OrderDetails({
   laborItem,
   setLaborItem,
   addPart,
-  addLabor
+  addLabor,
+  order,
+  onAction
 }) {
+  const partsTotal = details.parts.reduce(
+    (total, item) => total + item.quantity * item.unit_price,
+    0
+  )
+  const laborTotal = details.labor.reduce((total, item) => total + Number(item.labor_cost), 0)
   return (
     <section className="card order-details">
-      <CardTitle eyebrow="DETALHAMENTO" title={`Itens da OS #${id}`} />
+      <div className="order-identity">
+        <div>
+          <small>ORDEM DE SERVIÇO</small>
+          <h2>OS #{id}</h2>
+          <p>
+            {order?.customer_name} · {order?.license_plate} · {order?.brand} {order?.model}
+          </p>
+        </div>
+        <span className="status status-open">{order?.status || 'Aberta'}</span>
+      </div>
+      <div className="order-actions">
+        <button type="button" className="outline" onClick={() => onAction('whatsapp')}>
+          Enviar orçamento
+        </button>
+        <button type="button" className="outline" onClick={() => onAction('print')}>
+          Imprimir OS
+        </button>
+        <button type="button" className="primary" onClick={() => onAction('finish')}>
+          Finalizar e cobrar
+        </button>
+      </div>
       <div className="detail-forms">
         <form onSubmit={addPart}>
           <strong>Adicionar peca</strong>
@@ -999,6 +1167,17 @@ function OrderDetails({
             Adicionar
           </button>
         </form>
+      </div>
+      <div className="order-total">
+        <span>
+          Mão de obra <strong>R$ {laborTotal.toFixed(2)}</strong>
+        </span>
+        <span>
+          Peças <strong>R$ {partsTotal.toFixed(2)}</strong>
+        </span>
+        <b>
+          Total <strong>R$ {(laborTotal + partsTotal).toFixed(2)}</strong>
+        </b>
       </div>
       <div className="line-items">
         <div>

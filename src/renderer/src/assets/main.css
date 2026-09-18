@@ -181,6 +181,87 @@ button {
   font-size: 12px;
   text-transform: capitalize;
 }
+.global-search {
+  position: relative;
+  width: min(430px, 42vw);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: white;
+}
+.global-search > span {
+  color: var(--orange);
+  font-size: 24px;
+  line-height: 1;
+}
+.global-search input {
+  width: 100%;
+  padding: 12px 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+}
+.global-search > button {
+  margin: 0;
+  padding: 0 3px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 20px;
+}
+.search-results {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 8px);
+  right: 0;
+  left: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: white;
+  box-shadow: 0 18px 35px #1d302f1c;
+}
+.search-results button {
+  display: grid;
+  grid-template-columns: 75px 1fr;
+  gap: 3px 10px;
+  width: 100%;
+  margin: 0;
+  padding: 12px 14px;
+  border: 0;
+  border-bottom: 1px solid #edf0ec;
+  background: white;
+  color: var(--ink);
+  text-align: left;
+}
+.search-results button:hover {
+  background: #fff7f2;
+}
+.search-results button span {
+  grid-row: span 2;
+  color: var(--orange);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+.search-results button strong {
+  font-size: 12px;
+}
+.search-results button small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.search-results p {
+  margin: 0;
+  padding: 16px;
+  color: var(--muted);
+  font-size: 12px;
+}
 .profile {
   display: flex;
   align-items: center;
@@ -335,6 +416,66 @@ button {
   grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.8fr);
   gap: 18px;
   margin-top: 18px;
+}
+.kanban-card {
+  margin-top: 18px;
+  overflow: hidden;
+}
+.kanban-board {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(150px, 1fr));
+  gap: 10px;
+  padding: 20px;
+  overflow-x: auto;
+}
+.kanban-column {
+  min-height: 155px;
+  padding: 10px;
+  border-radius: 5px;
+  background: #f5f7f3;
+}
+.kanban-heading {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+.kanban-heading b {
+  color: var(--orange);
+}
+.kanban-item {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  margin: 0 0 8px;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: white;
+  color: var(--ink);
+  text-align: left;
+}
+.kanban-item:hover {
+  border-color: var(--orange);
+  transform: translateY(-1px);
+}
+.kanban-item strong {
+  font-size: 12px;
+}
+.kanban-item span {
+  color: var(--orange);
+  font-size: 11px;
+  font-weight: 800;
+}
+.kanban-item small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .card {
   border: 1px solid var(--line);
@@ -604,6 +745,64 @@ td strong {
   gap: 18px;
   padding: 20px 24px;
   border-bottom: 1px solid var(--line);
+}
+.order-identity {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  padding: 22px 24px 10px;
+}
+.order-identity small {
+  color: var(--orange);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+.order-identity h2 {
+  margin: 6px 0;
+  font-family: Georgia, serif;
+  font-size: 24px;
+  font-weight: 500;
+}
+.order-identity p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.order-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 24px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.order-total {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 24px;
+  padding: 15px 24px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+.order-total span {
+  display: grid;
+  gap: 3px;
+}
+.order-total strong {
+  color: var(--ink);
+}
+.order-total b {
+  display: grid;
+  gap: 3px;
+  color: var(--orange);
+  font-size: 14px;
+}
+.order-total b strong {
+  font-family: Georgia, serif;
+  font-size: 22px;
+  font-weight: 500;
 }
 .detail-forms form {
   display: grid;
