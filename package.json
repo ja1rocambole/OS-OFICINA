@@ -18,6 +18,8 @@
     "build:linux": "npm run build && electron-builder --linux"
   },
   "dependencies": {
+    "@mantine/core": "^9.6.1",
+    "@mantine/hooks": "^9.6.1",
     "better-sqlite3": "^13.0.3"
   },
   "devDependencies": {
