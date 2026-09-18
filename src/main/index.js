@@ -21,6 +21,7 @@ const createWindow = () => {
     }
   })
 
+  win.maximize()
   win.loadFile(join(__dirname, '../renderer/index.html'))
 }
 
