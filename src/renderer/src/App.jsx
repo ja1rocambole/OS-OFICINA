@@ -1,31 +1,10 @@
+/* eslint-disable react/prop-types */
 import { useEffect, useState } from 'react'
 
-function App() {
-  const [activeModule, setActiveModule] = useState('customers')
-  const [customers, setCustomers] = useState([])
-  const [employees, setEmployees] = useState([])
-  const [vehicles, setVehicles] = useState([])
-  const [parts, setParts] = useState([])
-  const [serviceOrders, setServiceOrders] = useState([])
-  const [selectedServiceOrderId, setSelectedServiceOrderId] = useState('')
-  const [serviceOrderDetails, setServiceOrderDetails] = useState({ parts: [], labor: [] })
-  const [selectedCustomerId, setSelectedCustomerId] = useState('')
-  const [serviceOrderVehicles, setServiceOrderVehicles] = useState([])
-  const [customerForm, setCustomerForm] = useState({
-    id: null,
-    name: '',
-    phone: '',
-    document: '',
-    address: ''
-  })
-  const [employeeForm, setEmployeeForm] = useState({
-    id: null,
-    name: '',
-    phone: '',
-    document: '',
-    role: ''
-  })
-  const [vehicleForm, setVehicleForm] = useState({
+const blank = {
+  customer: { id: null, name: '', phone: '', document: '', address: '' },
+  employee: { id: null, name: '', phone: '', document: '', role: '' },
+  vehicle: {
     id: null,
     customerId: '',
     licensePlate: '',
@@ -33,16 +12,16 @@ function App() {
     model: '',
     year: '',
     color: ''
-  })
-  const [partForm, setPartForm] = useState({
+  },
+  part: {
     id: null,
     internalCode: '',
     description: '',
     stockQuantity: '0',
     costPrice: '0',
     sellingPrice: '0'
-  })
-  const [serviceOrderForm, setServiceOrderForm] = useState({
+  },
+  order: {
     customerId: '',
     vehicleId: '',
     employeeId: '',
@@ -50,1207 +29,1097 @@ function App() {
     reportedDefect: '',
     mechanicNotes: '',
     status: 'Quote'
-  })
-  const [serviceOrderPartForm, setServiceOrderPartForm] = useState({
-    partId: '',
-    quantity: '1'
-  })
-  const [serviceOrderLaborForm, setServiceOrderLaborForm] = useState({
-    description: '',
-    laborCost: ''
-  })
-  const [isSaving, setIsSaving] = useState(false)
-  const [error, setError] = useState('')
+  }
+}
 
-  const loadCustomers = async () => {
-    try {
-      setCustomers(await window.api.getCustomers())
-    } catch (loadError) {
-      console.error(loadError)
-      setError('Não foi possível carregar os clientes.')
-    }
+const navigation = [
+  ['dashboard', 'Visao geral'],
+  ['service-orders', 'Ordens de servico'],
+  ['customers', 'Clientes'],
+  ['vehicles', 'Veiculos'],
+  ['parts', 'Pecas e estoque'],
+  ['employees', 'Funcionarios']
+]
+
+function App() {
+  const [view, setView] = useState('dashboard')
+  const [customers, setCustomers] = useState([])
+  const [employees, setEmployees] = useState([])
+  const [vehicles, setVehicles] = useState([])
+  const [parts, setParts] = useState([])
+  const [orders, setOrders] = useState([])
+  const [forms, setForms] = useState(blank)
+  const [orderVehicles, setOrderVehicles] = useState([])
+  const [selectedOrder, setSelectedOrder] = useState(null)
+  const [details, setDetails] = useState({ parts: [], labor: [] })
+  const [partItem, setPartItem] = useState({ partId: '', quantity: '1' })
+  const [laborItem, setLaborItem] = useState({ description: '', laborCost: '' })
+  const [notice, setNotice] = useState(null)
+  const [saving, setSaving] = useState(false)
+
+  const notify = (type, message) => {
+    setNotice({ type, message })
+    window.setTimeout(() => setNotice(null), 4000)
   }
 
-  const loadEmployees = async () => {
-    try {
-      setEmployees(await window.api.getEmployees())
-    } catch (loadError) {
-      console.error(loadError)
-      setError('Não foi possível carregar os funcionários.')
-    }
-  }
-
-  const loadVehicles = async (customerId) => {
-    try {
-      setVehicles(await window.api.getVehiclesByCustomer(customerId))
-    } catch (loadError) {
-      console.error(loadError)
-      setError('Não foi possível carregar os veículos.')
-    }
-  }
-
-  const loadParts = async () => {
-    try {
-      setParts(await window.api.getParts())
-    } catch (loadError) {
-      console.error(loadError)
-      setError('Não foi possível carregar as peças.')
-    }
-  }
-
-  const loadServiceOrders = async () => {
-    try {
-      setServiceOrders(await window.api.getServiceOrders())
-    } catch (loadError) {
-      console.error(loadError)
-      setError('Não foi possível carregar as ordens de serviço.')
-    }
-  }
-
-  const loadServiceOrderDetails = async (serviceOrderId) => {
-    try {
-      setServiceOrderDetails(await window.api.getServiceOrderDetails(serviceOrderId))
-    } catch (loadError) {
-      console.error(loadError)
-      setError('Não foi possível carregar os itens da ordem de serviço.')
-    }
-  }
-
-  useEffect(() => {
-    let isMounted = true
-
+  const fetchAll = () =>
     Promise.all([
       window.api.getCustomers(),
       window.api.getEmployees(),
       window.api.getParts(),
       window.api.getServiceOrders()
     ])
-      .then(([customerList, employeeList, partList, serviceOrderList]) => {
-        if (isMounted) {
-          setCustomers(customerList)
-          setEmployees(employeeList)
-          setParts(partList)
-          setServiceOrders(serviceOrderList)
-        }
+
+  const applyData = ([customerList, employeeList, partList, orderList]) => {
+    setCustomers(customerList)
+    setEmployees(employeeList)
+    setParts(partList)
+    setOrders(orderList)
+  }
+
+  const loadAll = async () => {
+    try {
+      applyData(await fetchAll())
+    } catch (error) {
+      console.error(error)
+      notify('error', 'Nao foi possivel carregar os dados.')
+    }
+  }
+
+  useEffect(() => {
+    let mounted = true
+    fetchAll()
+      .then((data) => {
+        if (mounted) applyData(data)
       })
-      .catch((loadError) => {
-        console.error(loadError)
-        if (isMounted) {
-          setError('Não foi possível carregar os dados.')
-        }
+      .catch((error) => {
+        console.error(error)
+        if (mounted) notify('error', 'Nao foi possivel carregar os dados.')
       })
 
     return () => {
-      isMounted = false
+      mounted = false
     }
   }, [])
 
-  const handleChange = ({ target }) => {
-    const updateForm =
-      activeModule === 'customers'
-        ? setCustomerForm
-        : activeModule === 'employees'
-          ? setEmployeeForm
-          : activeModule === 'vehicles'
-            ? setVehicleForm
-            : activeModule === 'parts'
-              ? setPartForm
-              : setServiceOrderForm
-    updateForm((currentData) => ({ ...currentData, [target.name]: target.value }))
+  const changeView = (nextView) => {
+    setView(nextView)
+    setNotice(null)
   }
 
-  const handleSubmit = async (event) => {
+  const updateForm = (type, field, value) => {
+    setForms((current) => ({ ...current, [type]: { ...current[type], [field]: value } }))
+  }
+
+  const resetForm = (type) => setForms((current) => ({ ...current, [type]: { ...blank[type] } }))
+
+  const saveRecord = async (event, type) => {
     event.preventDefault()
-
-    const formData =
-      activeModule === 'customers'
-        ? customerForm
-        : activeModule === 'employees'
-          ? employeeForm
-          : activeModule === 'vehicles'
-            ? vehicleForm
-            : activeModule === 'parts'
-              ? partForm
-              : serviceOrderForm
-
-    if (activeModule === 'vehicles' && !formData.customerId) {
-      setError('Selecione um cliente para o veículo.')
-      return
-    }
-
-    if (activeModule === 'service-orders' && !formData.customerId) {
-      setError('Selecione um cliente para a ordem de serviço.')
-      return
-    }
-
-    if (activeModule === 'service-orders' && !formData.vehicleId) {
-      setError('Selecione um veículo para a ordem de serviço.')
-      return
-    }
-
-    if (activeModule === 'service-orders' && !formData.reportedDefect.trim()) {
-      setError('Informe o defeito relatado pelo cliente.')
-      return
-    }
-
-    if (activeModule === 'parts' && !formData.description.trim()) {
-      setError('Informe a descrição da peça.')
-      return
-    }
-
-    if (activeModule === 'vehicles' && (!formData.licensePlate || !formData.licensePlate.trim())) {
-      setError('Informe a placa do veículo.')
-      return
-    }
-
-    if (!['vehicles', 'parts'].includes(activeModule) && !formData.name.trim()) {
-      setError(`Informe o nome do ${activeModule === 'customers' ? 'cliente' : 'funcionário'}.`)
-      return
-    }
-
-    setIsSaving(true)
-    setError('')
-
+    const data = forms[type]
+    const required =
+      type === 'customer' || type === 'employee'
+        ? data.name
+        : type === 'vehicle'
+          ? data.customerId && data.licensePlate
+          : data.description
+    if (!required) return notify('error', 'Preencha os campos obrigatorios.')
+    setSaving(true)
     try {
-      if (activeModule === 'customers') {
-        if (customerForm.id) {
-          await window.api.updateCustomer(formData)
-        } else {
-          await window.api.saveCustomer(formData)
-        }
-        setCustomerForm({ id: null, name: '', phone: '', document: '', address: '' })
-        await loadCustomers()
-      } else if (activeModule === 'employees' && employeeForm.id) {
-        await window.api.updateEmployee(formData)
-        setEmployeeForm({ id: null, name: '', phone: '', document: '', role: '' })
-        await loadEmployees()
-      } else if (activeModule === 'employees') {
-        await window.api.saveEmployee(formData)
-        setEmployeeForm({ id: null, name: '', phone: '', document: '', role: '' })
-        await loadEmployees()
-      } else if (activeModule === 'vehicles') {
-        if (vehicleForm.id) {
-          await window.api.updateVehicle(formData)
-        } else {
-          await window.api.saveVehicle(formData)
-        }
-        setVehicleForm({
-          id: null,
-          customerId: selectedCustomerId,
-          licensePlate: '',
-          brand: '',
-          model: '',
-          year: '',
-          color: ''
-        })
-        await loadVehicles(selectedCustomerId)
-      } else if (activeModule === 'parts') {
-        if (partForm.id) {
-          await window.api.updatePart(formData)
-        } else {
-          await window.api.savePart(formData)
-        }
-        setPartForm({
-          id: null,
-          internalCode: '',
-          description: '',
-          stockQuantity: '0',
-          costPrice: '0',
-          sellingPrice: '0'
-        })
-        await loadParts()
-      } else if (activeModule === 'service-orders') {
-        await window.api.saveServiceOrder(formData)
-        setServiceOrderForm({
-          customerId: '',
-          vehicleId: '',
-          employeeId: '',
-          mileage: '',
-          reportedDefect: '',
-          mechanicNotes: '',
-          status: 'Quote'
-        })
-        setServiceOrderVehicles([])
-        await loadServiceOrders()
-      }
-    } catch (saveError) {
-      console.error(saveError)
-      setError(
-        `Não foi possível salvar o ${
-          activeModule === 'customers'
-            ? 'cliente'
-            : activeModule === 'employees'
-              ? 'funcionário'
-              : activeModule === 'vehicles'
-                ? 'veículo'
-                : activeModule === 'parts'
-                  ? 'peça'
-                  : 'ordem de serviço'
-        }.`
-      )
+      if (type === 'customer')
+        data.id ? await window.api.updateCustomer(data) : await window.api.saveCustomer(data)
+      if (type === 'employee')
+        data.id ? await window.api.updateEmployee(data) : await window.api.saveEmployee(data)
+      if (type === 'vehicle')
+        data.id ? await window.api.updateVehicle(data) : await window.api.saveVehicle(data)
+      if (type === 'part')
+        data.id ? await window.api.updatePart(data) : await window.api.savePart(data)
+      resetForm(type)
+      await loadAll()
+      if (type === 'vehicle' && data.customerId) await loadVehicles(data.customerId)
+      notify('success', 'Registro salvo com sucesso.')
+    } catch (error) {
+      console.error(error)
+      notify('error', 'Nao foi possivel salvar o registro.')
     } finally {
-      setIsSaving(false)
+      setSaving(false)
     }
   }
 
-  const handleCustomerSelection = async ({ target }) => {
-    setSelectedCustomerId(target.value)
-    setVehicleForm((currentData) => ({ ...currentData, customerId: target.value }))
-    setError('')
-    await loadVehicles(target.value)
+  const loadVehicles = async (customerId) => {
+    setVehicles(customerId ? await window.api.getVehiclesByCustomer(customerId) : [])
+    updateForm('vehicle', 'customerId', customerId)
   }
 
-  const handleServiceOrderCustomerSelection = async ({ target }) => {
-    const customerId = target.value
-    setServiceOrderForm((currentData) => ({
-      ...currentData,
-      customerId,
-      vehicleId: ''
-    }))
-    setError('')
-    setServiceOrderVehicles([])
-
-    if (customerId) {
-      setServiceOrderVehicles(await window.api.getVehiclesByCustomer(customerId))
-    }
+  const selectOrderCustomer = async (customerId) => {
+    updateForm('order', 'customerId', customerId)
+    updateForm('order', 'vehicleId', '')
+    setOrderVehicles(customerId ? await window.api.getVehiclesByCustomer(customerId) : [])
   }
 
-  const handleServiceOrderSelection = async (serviceOrderId) => {
-    setSelectedServiceOrderId(serviceOrderId)
-    setError('')
-    await loadServiceOrderDetails(serviceOrderId)
-  }
-
-  const handleServiceOrderStatus = async (serviceOrderId, status) => {
-    const action = status === 'Completed' ? 'concluir' : 'cancelar'
-    if (!window.confirm(`Deseja ${action} esta ordem de serviço?`)) {
-      return
-    }
-
-    try {
-      setError('')
-      await window.api.updateServiceOrderStatus({ serviceOrderId, status })
-      await loadServiceOrders()
-    } catch (statusError) {
-      console.error(statusError)
-      setError('Não foi possível atualizar o status da ordem de serviço.')
-    }
-  }
-
-  const handleAddServiceOrderPart = async (event) => {
+  const saveOrder = async (event) => {
     event.preventDefault()
-
-    if (!serviceOrderPartForm.partId || Number(serviceOrderPartForm.quantity) <= 0) {
-      setError('Selecione uma peça e informe uma quantidade válida.')
-      return
-    }
-
+    const data = forms.order
+    if (!data.customerId || !data.vehicleId || !data.reportedDefect)
+      return notify('error', 'Cliente, veiculo e defeito sao obrigatorios.')
     try {
-      setError('')
+      await window.api.saveServiceOrder(data)
+      resetForm('order')
+      setOrderVehicles([])
+      await loadAll()
+      notify('success', 'Ordem de servico aberta.')
+    } catch (error) {
+      console.error(error)
+      notify('error', 'Nao foi possivel abrir a ordem.')
+    }
+  }
+
+  const openOrder = async (orderId) => {
+    setSelectedOrder(orderId)
+    setDetails(await window.api.getServiceOrderDetails(orderId))
+  }
+
+  const addPart = async (event) => {
+    event.preventDefault()
+    try {
       await window.api.addServiceOrderPart({
-        serviceOrderId: selectedServiceOrderId,
-        partId: serviceOrderPartForm.partId,
-        quantity: serviceOrderPartForm.quantity
+        serviceOrderId: selectedOrder,
+        partId: partItem.partId,
+        quantity: partItem.quantity
       })
-      setServiceOrderPartForm({ partId: '', quantity: '1' })
-      await Promise.all([
-        loadServiceOrderDetails(selectedServiceOrderId),
-        loadParts(),
-        loadServiceOrders()
-      ])
-    } catch (itemError) {
-      console.error(itemError)
-      setError('Não foi possível adicionar a peça à ordem de serviço.')
+      setPartItem({ partId: '', quantity: '1' })
+      await loadAll()
+      setDetails(await window.api.getServiceOrderDetails(selectedOrder))
+      notify('success', 'Peca adicionada a OS.')
+    } catch (error) {
+      console.error(error)
+      notify('error', 'Nao foi possivel adicionar a peca.')
     }
   }
 
-  const handleAddServiceOrderLabor = async (event) => {
+  const addLabor = async (event) => {
     event.preventDefault()
-
-    if (!serviceOrderLaborForm.description.trim() || Number(serviceOrderLaborForm.laborCost) < 0) {
-      setError('Informe a descrição e um custo válido para a mão de obra.')
-      return
-    }
-
     try {
-      setError('')
-      await window.api.addServiceOrderLabor({
-        serviceOrderId: selectedServiceOrderId,
-        description: serviceOrderLaborForm.description,
-        laborCost: serviceOrderLaborForm.laborCost
-      })
-      setServiceOrderLaborForm({ description: '', laborCost: '' })
-      await Promise.all([loadServiceOrderDetails(selectedServiceOrderId), loadServiceOrders()])
-    } catch (itemError) {
-      console.error(itemError)
-      setError('Não foi possível adicionar a mão de obra à ordem de serviço.')
+      await window.api.addServiceOrderLabor({ serviceOrderId: selectedOrder, ...laborItem })
+      setLaborItem({ description: '', laborCost: '' })
+      await loadAll()
+      setDetails(await window.api.getServiceOrderDetails(selectedOrder))
+      notify('success', 'Mao de obra adicionada a OS.')
+    } catch (error) {
+      console.error(error)
+      notify('error', 'Nao foi possivel adicionar a mao de obra.')
     }
   }
 
-  const handleRemoveServiceOrderPart = async (itemId) => {
-    if (!window.confirm('Deseja remover esta peça da ordem de serviço?')) {
-      return
-    }
-
+  const changeStatus = async (orderId, status) => {
     try {
-      setError('')
-      await window.api.removeServiceOrderPart(itemId)
-      await Promise.all([
-        loadServiceOrderDetails(selectedServiceOrderId),
-        loadParts(),
-        loadServiceOrders()
-      ])
-    } catch (itemError) {
-      console.error(itemError)
-      setError('Não foi possível remover a peça da ordem de serviço.')
+      await window.api.updateServiceOrderStatus({ serviceOrderId: orderId, status })
+      await loadAll()
+      notify('success', 'Status atualizado.')
+    } catch (error) {
+      console.error(error)
+      notify('error', 'Nao foi possivel atualizar o status.')
     }
   }
 
-  const handleRemoveServiceOrderLabor = async (itemId) => {
-    if (!window.confirm('Deseja remover esta mão de obra da ordem de serviço?')) {
-      return
-    }
-
-    try {
-      setError('')
-      await window.api.removeServiceOrderLabor(itemId)
-      await Promise.all([loadServiceOrderDetails(selectedServiceOrderId), loadServiceOrders()])
-    } catch (itemError) {
-      console.error(itemError)
-      setError('Não foi possível remover a mão de obra da ordem de serviço.')
+  const edit = (type, record) => setForms((current) => ({ ...current, [type]: record }))
+  const deactivateEmployee = async (id) => {
+    if (window.confirm('Desativar este funcionario?')) {
+      await window.api.deleteEmployee(id)
+      await loadAll()
+      notify('success', 'Funcionario desativado.')
     }
   }
-
-  const handleEditEmployee = (employee) => {
-    setActiveModule('employees')
-    setError('')
-    setEmployeeForm({
-      id: employee.id,
-      name: employee.name,
-      phone: employee.phone || '',
-      document: employee.document || '',
-      role: employee.role || ''
-    })
-  }
-
-  const handleEditCustomer = (customer) => {
-    setActiveModule('customers')
-    setError('')
-    setCustomerForm({
-      id: customer.id,
-      name: customer.name,
-      phone: customer.phone || '',
-      document: customer.document || '',
-      address: customer.address || ''
-    })
-  }
-
-  const handleDeleteEmployee = async (employeeId) => {
-    if (!window.confirm('Deseja desativar este funcionário?')) {
-      return
-    }
-
-    try {
-      setError('')
-      await window.api.deleteEmployee(employeeId)
-      await loadEmployees()
-    } catch (deleteError) {
-      console.error(deleteError)
-      setError('Não foi possível desativar o funcionário.')
+  const removeVehicle = async (id) => {
+    if (window.confirm('Excluir este veiculo?')) {
+      try {
+        await window.api.deleteVehicle(id)
+        await loadVehicles(forms.vehicle.customerId)
+        notify('success', 'Veiculo excluido.')
+      } catch {
+        notify('error', 'Veiculo com historico de OS nao pode ser excluido.')
+      }
     }
   }
 
-  const handleEditPart = (part) => {
-    setActiveModule('parts')
-    setError('')
-    setPartForm({
-      id: part.id,
-      internalCode: part.internal_code || '',
-      description: part.description,
-      stockQuantity: String(part.stock_quantity),
-      costPrice: String(part.cost_price),
-      sellingPrice: String(part.selling_price)
-    })
+  const labels = {
+    dashboard: 'Visao geral',
+    customers: 'Clientes',
+    employees: 'Funcionarios',
+    vehicles: 'Veiculos',
+    parts: 'Pecas e estoque',
+    'service-orders': 'Ordens de servico'
   }
-
-  const handleEditVehicle = (vehicle) => {
-    setActiveModule('vehicles')
-    setSelectedCustomerId(String(vehicle.customer_id))
-    setError('')
-    setVehicleForm({
-      id: vehicle.id,
-      customerId: String(vehicle.customer_id),
-      licensePlate: vehicle.license_plate,
-      brand: vehicle.brand || '',
-      model: vehicle.model || '',
-      year: vehicle.year || '',
-      color: vehicle.color || ''
-    })
-  }
-
-  const handleDeleteVehicle = async (vehicleId) => {
-    if (!window.confirm('Deseja excluir este veículo?')) {
-      return
-    }
-
-    try {
-      setError('')
-      await window.api.deleteVehicle(vehicleId)
-      await loadVehicles(selectedCustomerId)
-    } catch (deleteError) {
-      console.error(deleteError)
-      setError('Não foi possível excluir o veículo. Ele pode possuir histórico de OS.')
-    }
-  }
-
-  const isCustomerModule = activeModule === 'customers'
-  const isEmployeeModule = activeModule === 'employees'
-  const isVehicleModule = activeModule === 'vehicles'
-  const isServiceOrderModule = activeModule === 'service-orders'
-  const formData = isCustomerModule
-    ? customerForm
-    : isEmployeeModule
-      ? employeeForm
-      : isVehicleModule
-        ? vehicleForm
-        : activeModule === 'parts'
-          ? partForm
-          : serviceOrderForm
-  const moduleLabel = isCustomerModule
-    ? 'Clientes'
-    : isEmployeeModule
-      ? 'Funcionários'
-      : isVehicleModule
-        ? 'Veículos'
-        : activeModule === 'parts'
-          ? 'Peças e estoque'
-          : 'Ordens de serviço'
 
   return (
-    <main className="app-shell">
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">OS Oficina</p>
-          <h1>{moduleLabel}</h1>
-          <p className="page-description">
-            {isCustomerModule
-              ? 'Cadastre e consulte os clientes da oficina.'
-              : isEmployeeModule
-                ? 'Gerencie os funcionários da oficina.'
-                : isVehicleModule
-                  ? 'Cadastre veículos vinculados aos clientes.'
-                  : activeModule === 'parts'
-                    ? 'Controle peças, estoque e preços de venda.'
-                    : 'Abra e acompanhe as ordens da oficina.'}
-          </p>
+    <div className="workspace">
+      <aside className="sidebar">
+        <div className="brand">
+          <span>OS</span>
+          <div>
+            <strong>OS Oficina</strong>
+            <small>gestao de oficina</small>
+          </div>
         </div>
-        <span className="customer-count">
-          {isCustomerModule
-            ? customers.length
-            : isEmployeeModule
-              ? employees.length
-              : isVehicleModule
-                ? vehicles.length
-                : activeModule === 'parts'
-                  ? parts.length
-                  : serviceOrders.length}{' '}
-          cadastrados
-        </span>
-      </header>
-
-      <nav className="module-tabs" aria-label="Módulos">
-        <button
-          type="button"
-          className={isCustomerModule ? 'active' : ''}
-          onClick={() => {
-            setActiveModule('customers')
-            setError('')
-          }}
-        >
-          Clientes
-        </button>
-        <button
-          type="button"
-          className={isEmployeeModule ? 'active' : ''}
-          onClick={() => {
-            setActiveModule('employees')
-            setError('')
-          }}
-        >
-          Funcionários
-        </button>
-        <button
-          type="button"
-          className={activeModule === 'vehicles' ? 'active' : ''}
-          onClick={() => {
-            setActiveModule('vehicles')
-            setError('')
-          }}
-        >
-          Veículos
-        </button>
-        <button
-          type="button"
-          className={activeModule === 'parts' ? 'active' : ''}
-          onClick={() => {
-            setActiveModule('parts')
-            setError('')
-          }}
-        >
-          Peças
-        </button>
-        <button
-          type="button"
-          className={isServiceOrderModule ? 'active' : ''}
-          onClick={() => {
-            setActiveModule('service-orders')
-            setError('')
-          }}
-        >
-          Ordens de serviço
-        </button>
-      </nav>
-
-      <section className="content-grid">
-        <form className="panel customer-form" onSubmit={handleSubmit}>
-          <div className="panel-heading">
-            <div>
-              <p className="section-kicker">Novo registro</p>
-              <h2>
-                {formData.id
-                  ? 'Editar funcionário'
-                  : `Cadastrar ${
-                      isCustomerModule
-                        ? 'cliente'
-                        : isEmployeeModule
-                          ? 'funcionário'
-                          : isVehicleModule
-                            ? 'veículo'
-                            : activeModule === 'parts'
-                              ? 'peça'
-                              : 'ordem de serviço'
-                    }`}
-              </h2>
-            </div>
+        <p className="nav-title">Area de trabalho</p>
+        <nav>
+          {navigation.map(([id, label], index) => (
+            <button
+              type="button"
+              key={id}
+              className={view === id ? 'nav-link active' : 'nav-link'}
+              onClick={() => changeView(id)}
+            >
+              <span>0{index + 1}</span>
+              {label}
+            </button>
+          ))}
+        </nav>
+        <div className="connection">
+          <i />{' '}
+          <div>
+            <strong>Banco local</strong>
+            <small>conectado</small>
           </div>
-
-          {isCustomerModule || isEmployeeModule ? (
-            <>
-              <label>
-                Nome completo
-                <input name="name" value={formData.name} onChange={handleChange} required />
-              </label>
-              <label>
-                Telefone
-                <input name="phone" value={formData.phone} onChange={handleChange} />
-              </label>
-              <label>
-                CPF/CNPJ
-                <input name="document" value={formData.document} onChange={handleChange} />
-              </label>
-            </>
-          ) : isVehicleModule ? (
-            <>
-              <label>
-                Cliente
-                <select value={selectedCustomerId} onChange={handleCustomerSelection} required>
-                  <option value="">Selecione um cliente</option>
-                  {customers.map((customer) => (
-                    <option key={customer.id} value={customer.id}>
-                      {customer.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Placa
-                <input
-                  name="licensePlate"
-                  value={formData.licensePlate}
-                  onChange={handleChange}
-                  maxLength="8"
-                  required
-                />
-              </label>
-              <label>
-                Marca
-                <input name="brand" value={formData.brand} onChange={handleChange} />
-              </label>
-              <label>
-                Modelo
-                <input name="model" value={formData.model} onChange={handleChange} />
-              </label>
-              <label>
-                Ano
-                <input
-                  name="year"
-                  value={formData.year}
-                  onChange={handleChange}
-                  inputMode="numeric"
-                />
-              </label>
-            </>
-          ) : isServiceOrderModule ? (
-            <>
-              <label>
-                Cliente
-                <select
-                  name="customerId"
-                  value={formData.customerId}
-                  onChange={handleServiceOrderCustomerSelection}
-                  required
-                >
-                  <option value="">Selecione um cliente</option>
-                  {customers.map((customer) => (
-                    <option key={customer.id} value={customer.id}>
-                      {customer.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Veículo
-                <select
-                  name="vehicleId"
-                  value={formData.vehicleId}
-                  onChange={handleChange}
-                  required
-                >
-                  <option value="">Selecione um veículo</option>
-                  {serviceOrderVehicles.map((vehicle) => (
-                    <option key={vehicle.id} value={vehicle.id}>
-                      {vehicle.license_plate} - {vehicle.brand || ''} {vehicle.model || ''}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Funcionário responsável
-                <select name="employeeId" value={formData.employeeId} onChange={handleChange}>
-                  <option value="">Não atribuído</option>
-                  {employees.map((employee) => (
-                    <option key={employee.id} value={employee.id}>
-                      {employee.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Quilometragem
-                <input
-                  name="mileage"
-                  type="number"
-                  min="0"
-                  value={formData.mileage}
-                  onChange={handleChange}
-                />
-              </label>
-              <label>
-                Defeito relatado
-                <textarea
-                  name="reportedDefect"
-                  value={formData.reportedDefect}
-                  onChange={handleChange}
-                  required
-                />
-              </label>
-              <label>
-                Observações do mecânico
-                <textarea
-                  name="mechanicNotes"
-                  value={formData.mechanicNotes}
-                  onChange={handleChange}
-                />
-              </label>
-              <label>
-                Status
-                <select name="status" value={formData.status} onChange={handleChange}>
-                  <option value="Quote">Orçamento</option>
-                  <option value="Open">Aberta</option>
-                  <option value="In Progress">Em andamento</option>
-                  <option value="Completed">Concluída</option>
-                  <option value="Canceled">Cancelada</option>
-                </select>
-              </label>
-            </>
-          ) : (
-            <>
-              <label>
-                Código interno
-                <input name="internalCode" value={formData.internalCode} onChange={handleChange} />
-              </label>
-              <label>
-                Descrição
-                <input
-                  name="description"
-                  value={formData.description}
-                  onChange={handleChange}
-                  required
-                />
-              </label>
-              <label>
-                Quantidade em estoque
-                <input
-                  name="stockQuantity"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.stockQuantity}
-                  onChange={handleChange}
-                />
-              </label>
-              <label>
-                Preço de custo
-                <input
-                  name="costPrice"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.costPrice}
-                  onChange={handleChange}
-                />
-              </label>
-              <label>
-                Preço de venda
-                <input
-                  name="sellingPrice"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.sellingPrice}
-                  onChange={handleChange}
-                />
-              </label>
-            </>
-          )}
-          {isCustomerModule ? (
-            <label>
-              Endereço
-              <input name="address" value={formData.address} onChange={handleChange} />
-            </label>
-          ) : isEmployeeModule ? (
-            <label>
-              Cargo
-              <input name="role" value={formData.role} onChange={handleChange} />
-            </label>
-          ) : isVehicleModule ? (
-            <label>
-              Cor
-              <input name="color" value={formData.color} onChange={handleChange} />
-            </label>
-          ) : null}
-
-          {error && <p className="form-error">{error}</p>}
-          <button type="submit" disabled={isSaving}>
-            {isSaving
-              ? 'Salvando...'
-              : formData.id
-                ? isCustomerModule
-                  ? 'Atualizar cliente'
-                  : 'Atualizar funcionário'
-                : 'Salvar registro'}
-          </button>
-          {(isCustomerModule || isEmployeeModule || isVehicleModule || activeModule === 'parts') &&
-            formData.id && (
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() =>
-                  isCustomerModule
-                    ? setCustomerForm({ id: null, name: '', phone: '', document: '', address: '' })
-                    : isVehicleModule
-                      ? setVehicleForm({
-                          id: null,
-                          customerId: selectedCustomerId,
-                          licensePlate: '',
-                          brand: '',
-                          model: '',
-                          year: '',
-                          color: ''
-                        })
-                      : isEmployeeModule
-                        ? setEmployeeForm({ id: null, name: '', phone: '', document: '', role: '' })
-                        : setPartForm({
-                            id: null,
-                            internalCode: '',
-                            description: '',
-                            stockQuantity: '0',
-                            costPrice: '0',
-                            sellingPrice: '0'
-                          })
-                }
-              >
-                Cancelar edição
-              </button>
-            )}
-        </form>
-
-        <section className="panel customer-list">
-          <div className="panel-heading">
-            <div>
-              <p className="section-kicker">
-                {isCustomerModule ? 'Base de clientes' : 'Registros'}
-              </p>
-              <h2>
-                {isCustomerModule
-                  ? 'Clientes cadastrados'
-                  : isEmployeeModule
-                    ? 'Funcionários ativos'
-                    : isVehicleModule
-                      ? selectedCustomerId
-                        ? 'Veículos do cliente'
-                        : 'Selecione um cliente'
-                      : activeModule === 'parts'
-                        ? 'Peças cadastradas'
-                        : 'Ordens de serviço'}
-              </h2>
-            </div>
-          </div>
-
-          {(isCustomerModule
-            ? customers
-            : isEmployeeModule
-              ? employees
-              : isVehicleModule
-                ? vehicles
-                : parts
-          ).length === 0 ? (
-            <p className="empty-state">
-              {isCustomerModule
-                ? 'Nenhum cliente cadastrado ainda.'
-                : isEmployeeModule
-                  ? 'Nenhum funcionário cadastrado ainda.'
-                  : isVehicleModule
-                    ? selectedCustomerId
-                      ? 'Nenhum veículo cadastrado para este cliente.'
-                      : 'Selecione um cliente para consultar seus veículos.'
-                    : activeModule === 'parts'
-                      ? 'Nenhuma peça cadastrada ainda.'
-                      : 'Nenhuma ordem de serviço cadastrada ainda.'}
+        </div>
+      </aside>
+      <main className="main-content">
+        <header className="topbar">
+          <div>
+            <small>PAINEL OPERACIONAL</small>
+            <p>
+              {new Date().toLocaleDateString('pt-BR', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long'
+              })}
             </p>
+          </div>
+          <div className="profile">
+            <b>OF</b> Oficina local
+          </div>
+        </header>
+        {notice && <div className={`notice ${notice.type}`}>{notice.message}</div>}
+        {view === 'dashboard' ? (
+          <Dashboard
+            stats={{
+              customers: customers.length,
+              vehicles: vehicles.length,
+              parts: parts.length,
+              orders: orders.filter((item) => !['Completed', 'Canceled'].includes(item.status))
+                .length
+            }}
+            orders={orders}
+            onOpen={changeView}
+          />
+        ) : (
+          <>
+            <header className="view-heading">
+              <small>
+                MODULO {String(navigation.findIndex(([id]) => id === view) + 1).padStart(2, '0')}
+              </small>
+              <h1>{labels[view]}</h1>
+              <p>
+                {view === 'service-orders'
+                  ? 'Acompanhe o trabalho desde a entrada ate a entrega.'
+                  : 'Organize as informacoes da oficina com clareza.'}
+              </p>
+            </header>
+            {view === 'customers' && (
+              <CustomerModule
+                data={customers}
+                form={forms.customer}
+                update={(f, v) => updateForm('customer', f, v)}
+                submit={(e) => saveRecord(e, 'customer')}
+                edit={(item) => edit('customer', item)}
+                reset={() => resetForm('customer')}
+                saving={saving}
+              />
+            )}
+            {view === 'employees' && (
+              <EmployeeModule
+                data={employees}
+                form={forms.employee}
+                update={(f, v) => updateForm('employee', f, v)}
+                submit={(e) => saveRecord(e, 'employee')}
+                edit={(item) => edit('employee', item)}
+                remove={deactivateEmployee}
+                reset={() => resetForm('employee')}
+                saving={saving}
+              />
+            )}
+            {view === 'vehicles' && (
+              <VehicleModule
+                customers={customers}
+                data={vehicles}
+                form={forms.vehicle}
+                update={(f, v) => updateForm('vehicle', f, v)}
+                onCustomer={loadVehicles}
+                submit={(e) => saveRecord(e, 'vehicle')}
+                edit={(item) => edit('vehicle', { ...item, customerId: String(item.customer_id) })}
+                remove={removeVehicle}
+                reset={() => resetForm('vehicle')}
+                saving={saving}
+              />
+            )}
+            {view === 'parts' && (
+              <PartModule
+                data={parts}
+                form={forms.part}
+                update={(f, v) => updateForm('part', f, v)}
+                submit={(e) => saveRecord(e, 'part')}
+                edit={(item) =>
+                  edit('part', {
+                    id: item.id,
+                    internalCode: item.internal_code || '',
+                    description: item.description,
+                    stockQuantity: String(item.stock_quantity),
+                    costPrice: String(item.cost_price),
+                    sellingPrice: String(item.selling_price)
+                  })
+                }
+                reset={() => resetForm('part')}
+                saving={saving}
+              />
+            )}
+            {view === 'service-orders' && (
+              <OrderModule
+                customers={customers}
+                employees={employees}
+                vehicles={orderVehicles}
+                orders={orders}
+                form={forms.order}
+                update={(f, v) => updateForm('order', f, v)}
+                onCustomer={selectOrderCustomer}
+                submit={saveOrder}
+                select={openOrder}
+                selected={selectedOrder}
+                status={changeStatus}
+                details={details}
+                parts={parts}
+                partItem={partItem}
+                setPartItem={setPartItem}
+                laborItem={laborItem}
+                setLaborItem={setLaborItem}
+                addPart={addPart}
+                addLabor={addLabor}
+              />
+            )}
+          </>
+        )}
+      </main>
+    </div>
+  )
+}
+
+function Dashboard({ stats, orders, onOpen }) {
+  return (
+    <section className="dashboard">
+      <div className="hero">
+        <div>
+          <small>RESUMO DE HOJE</small>
+          <h1>
+            Bom trabalho,
+            <br />
+            <em>vamos organizar a oficina.</em>
+          </h1>
+          <p>Uma visão objetiva do que está acontecendo agora.</p>
+        </div>
+        <button type="button" className="primary" onClick={() => onOpen('service-orders')}>
+          + Abrir ordem de servico
+        </button>
+      </div>
+      <div className="stats">
+        {[
+          ['Ordens em andamento', stats.orders, 'orange'],
+          ['Clientes cadastrados', stats.customers, 'blue'],
+          ['Veiculos na base', stats.vehicles, 'green'],
+          ['Itens no estoque', stats.parts, 'purple']
+        ].map(([label, value, color]) => (
+          <div className={`stat ${color}`} key={label}>
+            <small>{label}</small>
+            <strong>{value}</strong>
+            <span>registros ativos</span>
+          </div>
+        ))}
+      </div>
+      <div className="dashboard-grid">
+        <section className="card recent">
+          <CardTitle
+            eyebrow="FLUXO DE TRABALHO"
+            title="Ordens recentes"
+            action="Ver todas"
+            onAction={() => onOpen('service-orders')}
+          />
+          {orders.length ? (
+            <OrderTable orders={orders.slice(0, 5)} compact />
           ) : (
-            <div className="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    {isCustomerModule ? (
-                      <>
-                        <th>Nome</th>
-                        <th>Telefone</th>
-                        <th>Documento</th>
-                        <th>Endereço</th>
-                        <th>Ações</th>
-                      </>
-                    ) : isEmployeeModule ? (
-                      <>
-                        <th>Nome</th>
-                        <th>Telefone</th>
-                        <th>Documento</th>
-                        <th>Cargo</th>
-                        <th>Ações</th>
-                      </>
-                    ) : isVehicleModule ? (
-                      <>
-                        <th>Placa</th>
-                        <th>Marca</th>
-                        <th>Modelo</th>
-                        <th>Ano</th>
-                        <th>Cor</th>
-                        <th>Ações</th>
-                      </>
-                    ) : activeModule === 'parts' ? (
-                      <>
-                        <th>Código</th>
-                        <th>Descrição</th>
-                        <th>Estoque</th>
-                        <th>Custo</th>
-                        <th>Venda</th>
-                        <th>Ações</th>
-                      </>
-                    ) : (
-                      <>
-                        <th>OS</th>
-                        <th>Cliente</th>
-                        <th>Veículo</th>
-                        <th>Responsável</th>
-                        <th>Status</th>
-                        <th>Entrada</th>
-                        <th>Ações</th>
-                      </>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {isCustomerModule
-                    ? customers.map((customer) => (
-                        <tr key={customer.id}>
-                          <td>{customer.name}</td>
-                          <td>{customer.phone || '-'}</td>
-                          <td>{customer.document || '-'}</td>
-                          <td>{customer.address || '-'}</td>
-                          <td className="row-actions">
-                            <button type="button" onClick={() => handleEditCustomer(customer)}>
-                              Editar
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    : isEmployeeModule
-                      ? employees.map((employee) => (
-                          <tr key={employee.id}>
-                            <td>{employee.name}</td>
-                            <td>{employee.phone || '-'}</td>
-                            <td>{employee.document || '-'}</td>
-                            <td>{employee.role || '-'}</td>
-                            <td className="row-actions">
-                              <button type="button" onClick={() => handleEditEmployee(employee)}>
-                                Editar
-                              </button>
-                              <button
-                                type="button"
-                                className="danger-button"
-                                onClick={() => handleDeleteEmployee(employee.id)}
-                              >
-                                Desativar
-                              </button>
-                            </td>
-                          </tr>
-                        ))
-                      : isVehicleModule
-                        ? vehicles.map((vehicle) => (
-                            <tr key={vehicle.id}>
-                              <td>{vehicle.license_plate}</td>
-                              <td>{vehicle.brand || '-'}</td>
-                              <td>{vehicle.model || '-'}</td>
-                              <td>{vehicle.year || '-'}</td>
-                              <td>{vehicle.color || '-'}</td>
-                              <td className="row-actions">
-                                <button type="button" onClick={() => handleEditVehicle(vehicle)}>
-                                  Editar
-                                </button>
-                                <button
-                                  type="button"
-                                  className="danger-button"
-                                  onClick={() => handleDeleteVehicle(vehicle.id)}
-                                >
-                                  Excluir
-                                </button>
-                              </td>
-                            </tr>
-                          ))
-                        : activeModule === 'parts'
-                          ? parts.map((part) => (
-                              <tr key={part.id}>
-                                <td>{part.internal_code || '-'}</td>
-                                <td>{part.description}</td>
-                                <td>{part.stock_quantity}</td>
-                                <td>R$ {Number(part.cost_price).toFixed(2)}</td>
-                                <td>R$ {Number(part.selling_price).toFixed(2)}</td>
-                                <td className="row-actions">
-                                  <button type="button" onClick={() => handleEditPart(part)}>
-                                    Editar
-                                  </button>
-                                </td>
-                              </tr>
-                            ))
-                          : serviceOrders.map((serviceOrder) => (
-                              <tr key={serviceOrder.id}>
-                                <td>
-                                  <button
-                                    type="button"
-                                    className="table-link"
-                                    onClick={() => handleServiceOrderSelection(serviceOrder.id)}
-                                  >
-                                    #{serviceOrder.id}
-                                  </button>
-                                </td>
-                                <td>{serviceOrder.customer_name}</td>
-                                <td>
-                                  {serviceOrder.license_plate} - {serviceOrder.brand || ''}{' '}
-                                  {serviceOrder.model || ''}
-                                </td>
-                                <td>{serviceOrder.employee_name || 'Não atribuído'}</td>
-                                <td>{serviceOrder.status}</td>
-                                <td>{serviceOrder.entry_date}</td>
-                                <td className="row-actions">
-                                  {!['Completed', 'Canceled'].includes(serviceOrder.status) && (
-                                    <>
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleServiceOrderStatus(serviceOrder.id, 'Completed')
-                                        }
-                                      >
-                                        Concluir
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className="danger-button"
-                                        onClick={() =>
-                                          handleServiceOrderStatus(serviceOrder.id, 'Canceled')
-                                        }
-                                      >
-                                        Cancelar
-                                      </button>
-                                    </>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                </tbody>
-              </table>
-            </div>
+            <Empty title="Nenhuma ordem aberta" text="As novas ordens aparecerão aqui." />
           )}
         </section>
-      </section>
-
-      {isServiceOrderModule && selectedServiceOrderId && (
-        <section className="service-order-details">
-          <div className="panel-heading">
+        <section className="card stock-card">
+          <CardTitle eyebrow="ESTOQUE" title="Resumo rápido" />
+          <div className="stock-summary">
+            <b>+</b>
             <div>
-              <p className="section-kicker">Detalhamento</p>
-              <h2>Itens da OS #{selectedServiceOrderId}</h2>
-            </div>
-            <strong className="service-order-total">
-              Total: R${' '}
-              {Number(
-                serviceOrders.find((order) => order.id === Number(selectedServiceOrderId))
-                  ?.total_amount || 0
-              ).toFixed(2)}
-            </strong>
-          </div>
-
-          <div className="details-grid">
-            <form className="item-form" onSubmit={handleAddServiceOrderPart}>
-              <h3>Adicionar peça</h3>
-              <label>
-                Peça
-                <select
-                  value={serviceOrderPartForm.partId}
-                  onChange={({ target }) =>
-                    setServiceOrderPartForm((currentData) => ({
-                      ...currentData,
-                      partId: target.value
-                    }))
-                  }
-                  required
-                >
-                  <option value="">Selecione uma peça</option>
-                  {parts.map((part) => (
-                    <option key={part.id} value={part.id}>
-                      {part.description} ({part.stock_quantity} em estoque)
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Quantidade
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={serviceOrderPartForm.quantity}
-                  onChange={({ target }) =>
-                    setServiceOrderPartForm((currentData) => ({
-                      ...currentData,
-                      quantity: target.value
-                    }))
-                  }
-                />
-              </label>
-              <button type="submit">Adicionar peça</button>
-            </form>
-
-            <form className="item-form" onSubmit={handleAddServiceOrderLabor}>
-              <h3>Adicionar mão de obra</h3>
-              <label>
-                Descrição
-                <input
-                  value={serviceOrderLaborForm.description}
-                  onChange={({ target }) =>
-                    setServiceOrderLaborForm((currentData) => ({
-                      ...currentData,
-                      description: target.value
-                    }))
-                  }
-                  required
-                />
-              </label>
-              <label>
-                Custo
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={serviceOrderLaborForm.laborCost}
-                  onChange={({ target }) =>
-                    setServiceOrderLaborForm((currentData) => ({
-                      ...currentData,
-                      laborCost: target.value
-                    }))
-                  }
-                  required
-                />
-              </label>
-              <button type="submit">Adicionar mão de obra</button>
-            </form>
-          </div>
-
-          <div className="details-grid">
-            <div>
-              <h3>Peças utilizadas</h3>
-              {serviceOrderDetails.parts.length === 0 ? (
-                <p className="empty-state">Nenhuma peça adicionada.</p>
-              ) : (
-                <ul className="detail-list">
-                  {serviceOrderDetails.parts.map((item) => (
-                    <li key={item.id}>
-                      <span>
-                        {item.description} x {item.quantity}
-                      </span>
-                      <span className="detail-actions">
-                        <strong>R$ {(item.quantity * item.unit_price).toFixed(2)}</strong>
-                        <button
-                          type="button"
-                          className="danger-button"
-                          onClick={() => handleRemoveServiceOrderPart(item.id)}
-                        >
-                          Remover
-                        </button>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <div>
-              <h3>Mão de obra</h3>
-              {serviceOrderDetails.labor.length === 0 ? (
-                <p className="empty-state">Nenhuma mão de obra adicionada.</p>
-              ) : (
-                <ul className="detail-list">
-                  {serviceOrderDetails.labor.map((item) => (
-                    <li key={item.id}>
-                      <span>{item.description}</span>
-                      <span className="detail-actions">
-                        <strong>R$ {Number(item.labor_cost).toFixed(2)}</strong>
-                        <button
-                          type="button"
-                          className="danger-button"
-                          onClick={() => handleRemoveServiceOrderLabor(item.id)}
-                        >
-                          Remover
-                        </button>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <strong>{stats.parts} tipos de pecas</strong>
+              <p>Controle o inventario e os precos de venda.</p>
             </div>
           </div>
+          <button type="button" className="outline" onClick={() => onOpen('parts')}>
+            Abrir estoque
+          </button>
         </section>
+      </div>
+    </section>
+  )
+}
+
+function CustomerModule({ data, form, update, submit, edit, reset, saving }) {
+  return (
+    <ModuleLayout
+      form={
+        <Form
+          title="cliente"
+          eyebrow="CADASTRO"
+          submit={submit}
+          saving={saving}
+          editing={form.id}
+          reset={reset}
+        >
+          <Field
+            label="Nome completo"
+            value={form.name}
+            onChange={(v) => update('name', v)}
+            required
+          />
+          <Field label="Telefone" value={form.phone} onChange={(v) => update('phone', v)} />
+          <Field
+            label="CPF ou CNPJ"
+            value={form.document}
+            onChange={(v) => update('document', v)}
+          />
+          <Field label="Endereco" value={form.address} onChange={(v) => update('address', v)} />
+        </Form>
+      }
+    >
+      <DataCard title="Clientes cadastrados" count={data.length}>
+        {data.length ? (
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Telefone</th>
+                <th>Documento</th>
+                <th>Endereco</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((item) => (
+                <tr key={item.id}>
+                  <td>
+                    <strong>{item.name}</strong>
+                  </td>
+                  <td>{item.phone || '-'}</td>
+                  <td>{item.document || '-'}</td>
+                  <td>{item.address || '-'}</td>
+                  <td>
+                    <button type="button" className="row-button" onClick={() => edit(item)}>
+                      Editar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <Empty title="Sua base está vazia" text="Cadastre o primeiro cliente para começar." />
+        )}
+      </DataCard>
+    </ModuleLayout>
+  )
+}
+function EmployeeModule({ data, form, update, submit, edit, remove, reset, saving }) {
+  return (
+    <ModuleLayout
+      form={
+        <Form
+          title="funcionario"
+          eyebrow="EQUIPE"
+          submit={submit}
+          saving={saving}
+          editing={form.id}
+          reset={reset}
+        >
+          <Field
+            label="Nome completo"
+            value={form.name}
+            onChange={(v) => update('name', v)}
+            required
+          />
+          <Field label="Telefone" value={form.phone} onChange={(v) => update('phone', v)} />
+          <Field
+            label="CPF ou CNPJ"
+            value={form.document}
+            onChange={(v) => update('document', v)}
+          />
+          <Field label="Cargo" value={form.role} onChange={(v) => update('role', v)} />
+        </Form>
+      }
+    >
+      <DataCard title="Equipe ativa" count={data.length}>
+        {data.length ? (
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Cargo</th>
+                <th>Telefone</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((item) => (
+                <tr key={item.id}>
+                  <td>
+                    <strong>{item.name}</strong>
+                  </td>
+                  <td>{item.role || '-'}</td>
+                  <td>{item.phone || '-'}</td>
+                  <td>
+                    <button type="button" className="row-button" onClick={() => edit(item)}>
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      className="row-button danger"
+                      onClick={() => remove(item.id)}
+                    >
+                      Desativar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <Empty
+            title="Nenhum funcionario ativo"
+            text="Cadastre sua equipe para atribuir responsaveis."
+          />
+        )}
+      </DataCard>
+    </ModuleLayout>
+  )
+}
+function VehicleModule({
+  customers,
+  data,
+  form,
+  update,
+  onCustomer,
+  submit,
+  edit,
+  remove,
+  reset,
+  saving
+}) {
+  return (
+    <ModuleLayout
+      form={
+        <Form
+          title="veiculo"
+          eyebrow="FROTA"
+          submit={submit}
+          saving={saving}
+          editing={form.id}
+          reset={reset}
+        >
+          <Select
+            label="Cliente proprietario"
+            value={form.customerId}
+            onChange={onCustomer}
+            required
+            options={customers.map((item) => [item.id, item.name])}
+          />
+          <div className="field-row">
+            <Field
+              label="Placa"
+              value={form.licensePlate}
+              onChange={(v) => update('licensePlate', v)}
+              required
+            />
+            <Field label="Ano" value={form.year} onChange={(v) => update('year', v)} />
+          </div>
+          <div className="field-row">
+            <Field label="Marca" value={form.brand} onChange={(v) => update('brand', v)} />
+            <Field label="Modelo" value={form.model} onChange={(v) => update('model', v)} />
+          </div>
+          <Field label="Cor" value={form.color} onChange={(v) => update('color', v)} />
+        </Form>
+      }
+    >
+      <DataCard
+        title={form.customerId ? 'Veiculos do cliente' : 'Selecione um cliente'}
+        count={data.length}
+      >
+        {data.length ? (
+          <table>
+            <thead>
+              <tr>
+                <th>Placa</th>
+                <th>Veiculo</th>
+                <th>Ano</th>
+                <th>Cor</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((item) => (
+                <tr key={item.id}>
+                  <td>
+                    <strong className="plate">{item.license_plate}</strong>
+                  </td>
+                  <td>
+                    {item.brand} {item.model}
+                  </td>
+                  <td>{item.year || '-'}</td>
+                  <td>{item.color || '-'}</td>
+                  <td>
+                    <button type="button" className="row-button" onClick={() => edit(item)}>
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      className="row-button danger"
+                      onClick={() => remove(item.id)}
+                    >
+                      Excluir
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <Empty
+            title="Nenhum veiculo para mostrar"
+            text="Selecione um cliente ou cadastre um veiculo."
+          />
+        )}
+      </DataCard>
+    </ModuleLayout>
+  )
+}
+function PartModule({ data, form, update, submit, edit, reset, saving }) {
+  return (
+    <ModuleLayout
+      form={
+        <Form
+          title="peca"
+          eyebrow="INVENTARIO"
+          submit={submit}
+          saving={saving}
+          editing={form.id}
+          reset={reset}
+        >
+          <Field
+            label="Codigo interno"
+            value={form.internalCode}
+            onChange={(v) => update('internalCode', v)}
+          />
+          <Field
+            label="Descricao"
+            value={form.description}
+            onChange={(v) => update('description', v)}
+            required
+          />
+          <div className="field-row">
+            <Field
+              label="Estoque"
+              type="number"
+              value={form.stockQuantity}
+              onChange={(v) => update('stockQuantity', v)}
+            />
+            <Field
+              label="Preco de custo"
+              type="number"
+              value={form.costPrice}
+              onChange={(v) => update('costPrice', v)}
+            />
+          </div>
+          <Field
+            label="Preco de venda"
+            type="number"
+            value={form.sellingPrice}
+            onChange={(v) => update('sellingPrice', v)}
+          />
+        </Form>
+      }
+    >
+      <DataCard title="Inventario" count={data.length}>
+        {data.length ? (
+          <table>
+            <thead>
+              <tr>
+                <th>Codigo</th>
+                <th>Descricao</th>
+                <th>Estoque</th>
+                <th>Venda</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.internal_code || '-'}</td>
+                  <td>
+                    <strong>{item.description}</strong>
+                  </td>
+                  <td>
+                    <span className={item.stock_quantity < 2 ? 'stock low' : 'stock'}>
+                      {item.stock_quantity}
+                    </span>
+                  </td>
+                  <td>R$ {Number(item.selling_price).toFixed(2)}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="row-button"
+                      onClick={() =>
+                        edit({
+                          id: item.id,
+                          internalCode: item.internal_code || '',
+                          description: item.description,
+                          stockQuantity: String(item.stock_quantity),
+                          costPrice: String(item.cost_price),
+                          sellingPrice: String(item.selling_price)
+                        })
+                      }
+                    >
+                      Editar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <Empty title="Estoque vazio" text="Cadastre a primeira peca do inventario." />
+        )}
+      </DataCard>
+    </ModuleLayout>
+  )
+}
+
+function OrderModule({
+  customers,
+  employees,
+  vehicles,
+  orders,
+  form,
+  update,
+  onCustomer,
+  submit,
+  select,
+  selected,
+  status,
+  details,
+  parts,
+  partItem,
+  setPartItem,
+  laborItem,
+  setLaborItem,
+  addPart,
+  addLabor
+}) {
+  return (
+    <div className="orders-layout">
+      <section className="card order-list">
+        <CardTitle
+          eyebrow="ACOMPANHAMENTO"
+          title="Ordens de servico"
+          action={`${orders.length} registros`}
+        />
+        <OrderTable orders={orders} onSelect={select} selectedId={selected} onStatus={status} />
+      </section>
+      <Form title="ordem de servico" eyebrow="NOVA OS" submit={submit} saving={false}>
+        <Select
+          label="Cliente"
+          value={form.customerId}
+          onChange={onCustomer}
+          required
+          options={customers.map((item) => [item.id, item.name])}
+        />
+        <Select
+          label="Veiculo"
+          value={form.vehicleId}
+          onChange={(v) => update('vehicleId', v)}
+          required
+          options={vehicles.map((item) => [
+            item.id,
+            `${item.license_plate} - ${item.brand} ${item.model}`
+          ])}
+        />
+        <Select
+          label="Responsavel"
+          value={form.employeeId}
+          onChange={(v) => update('employeeId', v)}
+          options={employees.map((item) => [item.id, item.name])}
+        />
+        <Field
+          label="Quilometragem"
+          type="number"
+          value={form.mileage}
+          onChange={(v) => update('mileage', v)}
+        />
+        <TextField
+          label="Defeito relatado"
+          value={form.reportedDefect}
+          onChange={(v) => update('reportedDefect', v)}
+          required
+        />
+        <TextField
+          label="Observacoes"
+          value={form.mechanicNotes}
+          onChange={(v) => update('mechanicNotes', v)}
+        />
+      </Form>
+      {selected && (
+        <OrderDetails
+          id={selected}
+          details={details}
+          parts={parts}
+          partItem={partItem}
+          setPartItem={setPartItem}
+          laborItem={laborItem}
+          setLaborItem={setLaborItem}
+          addPart={addPart}
+          addLabor={addLabor}
+        />
       )}
-    </main>
+    </div>
+  )
+}
+function OrderTable({ orders, onSelect, selectedId, onStatus }) {
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th>OS</th>
+          <th>Cliente</th>
+          <th>Veiculo</th>
+          <th>Status</th>
+          <th>Responsavel</th>
+          <th />
+        </tr>
+      </thead>
+      <tbody>
+        {orders.map((item) => (
+          <tr key={item.id} className={selectedId === item.id ? 'selected' : ''}>
+            <td>
+              <button type="button" className="table-link" onClick={() => onSelect?.(item.id)}>
+                #{item.id}
+              </button>
+            </td>
+            <td>
+              <strong>{item.customer_name}</strong>
+            </td>
+            <td>{item.license_plate}</td>
+            <td>
+              <span className={`status status-${item.status.toLowerCase().replaceAll(' ', '-')}`}>
+                {item.status}
+              </span>
+            </td>
+            <td>{item.employee_name || 'Nao atribuido'}</td>
+            <td>
+              {onStatus && !['Completed', 'Canceled'].includes(item.status) && (
+                <button
+                  type="button"
+                  className="row-button"
+                  onClick={() => onStatus(item.id, 'Completed')}
+                >
+                  Concluir
+                </button>
+              )}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+function OrderDetails({
+  id,
+  details,
+  parts,
+  partItem,
+  setPartItem,
+  laborItem,
+  setLaborItem,
+  addPart,
+  addLabor
+}) {
+  return (
+    <section className="card order-details">
+      <CardTitle eyebrow="DETALHAMENTO" title={`Itens da OS #${id}`} />
+      <div className="detail-forms">
+        <form onSubmit={addPart}>
+          <strong>Adicionar peca</strong>
+          <Select
+            label="Peca"
+            value={partItem.partId}
+            onChange={(v) => setPartItem({ ...partItem, partId: v })}
+            options={parts.map((item) => [item.id, `${item.description} (${item.stock_quantity})`])}
+          />
+          <Field
+            label="Quantidade"
+            type="number"
+            value={partItem.quantity}
+            onChange={(v) => setPartItem({ ...partItem, quantity: v })}
+          />
+          <button className="outline" type="submit">
+            Adicionar
+          </button>
+        </form>
+        <form onSubmit={addLabor}>
+          <strong>Adicionar mao de obra</strong>
+          <Field
+            label="Descricao"
+            value={laborItem.description}
+            onChange={(v) => setLaborItem({ ...laborItem, description: v })}
+          />
+          <Field
+            label="Valor"
+            type="number"
+            value={laborItem.laborCost}
+            onChange={(v) => setLaborItem({ ...laborItem, laborCost: v })}
+          />
+          <button className="outline" type="submit">
+            Adicionar
+          </button>
+        </form>
+      </div>
+      <div className="line-items">
+        <div>
+          <small>PECAS</small>
+          {details.parts.map((item) => (
+            <p key={item.id}>
+              <span>
+                {item.description} x {item.quantity}
+              </span>
+              <strong>R$ {(item.quantity * item.unit_price).toFixed(2)}</strong>
+            </p>
+          ))}
+        </div>
+        <div>
+          <small>MAO DE OBRA</small>
+          {details.labor.map((item) => (
+            <p key={item.id}>
+              <span>{item.description}</span>
+              <strong>R$ {Number(item.labor_cost).toFixed(2)}</strong>
+            </p>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+function ModuleLayout({ form, children }) {
+  return (
+    <div className="module-layout">
+      <div>{form}</div>
+      <div>{children}</div>
+    </div>
+  )
+}
+function Form({ title, eyebrow, submit, saving, editing, reset, children }) {
+  return (
+    <form className="card form-card" onSubmit={submit}>
+      <CardTitle eyebrow={eyebrow} title={editing ? `Editar ${title}` : `Novo ${title}`} />
+      {children}
+      <div className="form-actions">
+        <button className="primary" type="submit" disabled={saving}>
+          {saving ? 'Salvando...' : editing ? 'Atualizar' : 'Cadastrar'}
+        </button>
+        {editing && (
+          <button className="ghost" type="button" onClick={reset}>
+            Cancelar
+          </button>
+        )}
+      </div>
+    </form>
+  )
+}
+function Field({ label, value, onChange, type = 'text', required = false }) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <input
+        type={type}
+        value={value}
+        onChange={({ target }) => onChange(target.value)}
+        required={required}
+      />
+    </label>
+  )
+}
+function TextField({ label, value, onChange, required = false }) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <textarea
+        value={value}
+        onChange={({ target }) => onChange(target.value)}
+        required={required}
+      />
+    </label>
+  )
+}
+function Select({ label, value, onChange, options, required = false }) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <select value={value} onChange={({ target }) => onChange(target.value)} required={required}>
+        <option value="">Selecione</option>
+        {options.map(([id, text]) => (
+          <option key={id} value={id}>
+            {text}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+function DataCard({ title, count, children }) {
+  return (
+    <section className="card table-card">
+      <CardTitle eyebrow="REGISTROS" title={title} action={count} />
+      {children}
+    </section>
+  )
+}
+function CardTitle({ eyebrow, title, action, onAction }) {
+  return (
+    <div className="card-title">
+      <div>
+        <small>{eyebrow}</small>
+        <h2>{title}</h2>
+      </div>
+      {action && (
+        <button type="button" className="card-action" onClick={onAction}>
+          {action} {onAction && '→'}
+        </button>
+      )}
+    </div>
+  )
+}
+function Empty({ title, text }) {
+  return (
+    <div className="empty">
+      <strong>{title}</strong>
+      <p>{text}</p>
+    </div>
   )
 }
 
